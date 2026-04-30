@@ -1,0 +1,1260 @@
+<!DOCTYPE html>
+
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>MESBG</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0f0f0f;--bg2:#1a1a1a;--bg3:#242424;--bg4:#2e2e2e;
+  --border:#333;--border2:#444;
+  --text:#f0ede8;--text2:#999;--text3:#666;
+  --accent:#c8f060;--accent2:#8fb830;
+  --red:#ff5e5e;--yellow:#f0c060;
+  --kf:#7ecb6a;--lf:#60c0a0;--c50:#999;--lu:#e0a040;--ku:#e05050;
+  --r:10px;--r2:6px;
+  --font:'DM Sans',sans-serif;--mono:'DM Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:15px;min-height:100vh;padding-bottom:100px}
+
+/* ── Topbar ── */
+.topbar{background:var(–bg2);border-bottom:1px solid var(–border);padding:0 16px;height:50px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:300}
+
+/* Mode dropdown (left) */
+.mode-btn{display:flex;align-items:center;gap:6px;font-size:14px;font-weight:600;color:var(–text);background:none;border:none;cursor:pointer;padding:6px 0;font-family:var(–font)}
+.mode-btn .chevron{font-size:10px;color:var(–text3);transition:transform .15s}
+.mode-btn.open .chevron{transform:rotate(180deg)}
+.mode-dropdown{position:absolute;top:54px;left:16px;background:var(–bg2);border:1px solid var(–border2);border-radius:var(–r);overflow:hidden;z-index:400;min-width:180px;display:none;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.mode-dropdown.open{display:block}
+.mdrop-item{padding:12px 16px;font-size:14px;cursor:pointer;color:var(–text2);border-bottom:1px solid var(–border);display:flex;align-items:center;gap:10px}
+.mdrop-item:last-child{border-bottom:none}
+.mdrop-item:active{background:var(–bg3)}
+.mdrop-item.cur{color:var(–accent);font-weight:600}
+.mdrop-item .mdot{width:6px;height:6px;border-radius:50%;background:var(–border2);flex-shrink:0}
+.mdrop-item.cur .mdot{background:var(–accent)}
+
+/* Burger menu (right) */
+.burger-btn{width:36px;height:36px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;cursor:pointer;background:none;border:none;position:relative}
+.burger-btn span{display:block;width:18px;height:1.5px;background:var(–text2);border-radius:2px}
+.burger-menu{position:absolute;top:54px;right:16px;background:var(–bg2);border:1px solid var(–border2);border-radius:var(–r);overflow:hidden;z-index:400;min-width:160px;display:none;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.burger-menu.open{display:block}
+.bmenu-item{padding:12px 16px;font-size:14px;cursor:pointer;color:var(–text2);border-bottom:1px solid var(–border)}
+.bmenu-item:last-child{border-bottom:none}
+.bmenu-item:active{background:var(–bg3)}
+.bmenu-item.danger{color:var(–red)}
+
+/* Round badge (center-right, turnier only) */
+.round-badge{font-size:12px;color:var(–accent);font-family:var(–mono);background:var(–bg3);padding:5px 12px;border-radius:20px;border:1px solid var(–border);cursor:pointer;position:relative;user-select:none;display:none}
+.round-badge:active{background:var(–bg4)}
+.round-dropdown{position:absolute;top:calc(100% + 6px);right:0;background:var(–bg2);border:1px solid var(–border2);border-radius:var(–r);overflow:hidden;z-index:400;min-width:110px;display:none;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.round-dropdown.open{display:block}
+.rdrop-item{padding:10px 16px;font-size:13px;font-family:var(–mono);cursor:pointer;color:var(–text2);border-bottom:1px solid var(–border)}
+.rdrop-item:last-child{border-bottom:none}
+.rdrop-item:active{background:var(–bg3)}
+.rdrop-item.cur{color:var(–accent);font-weight:600}
+.rdrop-item.done{color:var(–lf)}
+
+/* ── Sub-tabs ── */
+.subtabs{display:flex;overflow-x:auto;background:var(–bg2);border-bottom:1px solid var(–border);scrollbar-width:none;position:sticky;top:50px;z-index:200}
+.subtabs::-webkit-scrollbar{display:none}
+.stab{flex-shrink:0;padding:10px 14px;font-size:12px;cursor:pointer;color:var(–text3);border-bottom:2px solid transparent;white-space:nowrap}
+.stab.active{color:var(–accent);border-bottom-color:var(–accent)}
+
+/* ── Content ── */
+.content{padding:16px;max-width:600px;margin:0 auto}
+.mode-panel{display:none}.mode-panel.active{display:block}
+.view{display:none}.view.active{display:block}
+.phase{display:none}.phase.active{display:block}
+
+/* ── Components ── */
+.card{background:var(–bg2);border:1px solid var(–border);border-radius:var(–r);padding:16px;margin-bottom:12px}
+.card-title{font-size:13px;font-weight:600;margin-bottom:12px}
+.label{font-size:11px;color:var(–text3);margin-bottom:5px;letter-spacing:.05em;text-transform:uppercase}
+.hint{font-size:12px;color:var(–text3);line-height:1.6}
+input[type=text],textarea{width:100%;padding:11px 12px;font-size:15px;background:var(–bg3);border:1px solid var(–border);border-radius:var(–r2);color:var(–text);font-family:var(–font);appearance:none}
+input[type=text]:focus,textarea:focus{outline:none;border-color:var(–border2)}
+input[type=number]{padding:10px 8px;font-size:16px;background:var(–bg3);border:1px solid var(–border);border-radius:var(–r2);color:var(–text);font-family:var(–mono);text-align:center;width:72px}
+input[type=number]:focus{outline:none;border-color:var(–border2)}
+select{width:100%;padding:11px 12px;font-size:14px;background:var(–bg3);border:1px solid var(–border);border-radius:var(–r2);color:var(–text);font-family:var(–font);appearance:none;-webkit-appearance:none}
+select:focus{outline:none;border-color:var(–border2)}
+.btn{display:inline-flex;align-items:center;justify-content:center;padding:11px 18px;font-size:14px;font-family:var(–font);font-weight:500;border:1px solid var(–border2);border-radius:var(–r2);background:var(–bg3);color:var(–text);cursor:pointer;white-space:nowrap}
+.btn:active{background:var(–bg4)}
+.btn-primary{background:var(–accent);color:#111;border-color:var(–accent);font-weight:600}
+.btn-primary:active{background:var(–accent2)}
+.btn-block{display:flex;width:100%;margin-bottom:8px}
+.btn-sm{padding:7px 12px;font-size:12px}
+.btn-danger{border-color:#553;color:var(–red)}
+.divider{border:none;border-top:1px solid var(–border);margin:14px 0}
+.row{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.tag{display:inline-block;font-size:11px;padding:3px 8px;background:var(–bg3);border:1px solid var(–border);border-radius:4px;color:var(–text2);margin:2px;font-family:var(–mono)}
+.chip{font-size:11px;padding:2px 8px;border-radius:4px;font-family:var(–mono);font-weight:500}
+.chip-kf{background:#1a2e10;color:var(–kf)}.chip-lf{background:#0a2018;color:var(–lf)}
+.chip-50{background:var(–bg4);color:var(–c50)}.chip-lu{background:#2e2010;color:var(–lu)}
+.chip-ku{background:#2e1010;color:var(–ku)}
+.player-toggles{display:flex;flex-wrap:wrap;gap:6px}
+.ptoggle{padding:6px 12px;font-size:12px;border:1px solid var(–border);border-radius:20px;cursor:pointer;background:var(–bg3);color:var(–text2)}
+.ptoggle.on{background:var(–accent);color:#111;border-color:var(–accent);font-weight:600}
+.rating-sel{padding:8px 10px;font-size:12px;font-family:var(–mono);background:var(–bg3);border:1px solid var(–border);border-radius:var(–r2);color:var(–text);width:100%;appearance:none;-webkit-appearance:none}
+.rating-sel.r-kf{border-color:var(–kf);color:var(–kf)}.rating-sel.r-lf{border-color:var(–lf);color:var(–lf)}
+.rating-sel.r-50{border-color:var(–c50);color:var(–c50)}.rating-sel.r-lu{border-color:var(–lu);color:var(–lu)}
+.rating-sel.r-ku{border-color:var(–ku);color:var(–ku)}
+.matrix-wrap{overflow-x:auto;margin-top:10px}
+.matrix-table{border-collapse:collapse;font-size:12px;width:100%}
+.matrix-table th{padding:8px 6px;text-align:center;color:var(–text3);font-weight:500;font-size:11px;border-bottom:1px solid var(–border);white-space:nowrap}
+.matrix-table th.rh{text-align:left;min-width:100px}
+.matrix-table td{padding:5px 4px;border-bottom:1px solid var(–border)}
+.combo-card{border:1px solid var(–border);border-radius:var(–r);padding:14px;margin-bottom:10px;cursor:pointer;background:var(–bg2)}
+.combo-card:active{background:var(–bg3)}
+.combo-card.picked{border-color:var(–accent);background:#1a2010}
+.combo-score-num{font-size:26px;font-weight:600;font-family:var(–mono);color:var(–accent)}
+.score-bar{height:4px;background:var(–bg4);border-radius:2px;margin:8px 0;overflow:hidden}
+.score-fill{height:100%;border-radius:2px;background:var(–accent)}
+.cov-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:8px}
+.cov-cell{font-size:10px;padding:5px 4px;border-radius:4px;text-align:center;line-height:1.4;font-family:var(–mono)}
+.cov-good{background:#1a2e10;color:var(–kf)}.cov-mid{background:#2e2010;color:var(–lu)}.cov-bad{background:#2e1010;color:var(–ku)}
+.box-ok{background:#0a2010;border:1px solid #2a5020;border-radius:var(–r2);padding:10px 12px;font-size:13px;color:var(–kf);margin-top:8px}
+.box-warn{background:#2a2000;border:1px solid #5a4000;border-radius:var(–r2);padding:10px 12px;font-size:13px;color:var(–yellow);margin-top:8px}
+.box-err{background:#2a0a0a;border:1px solid #5a2020;border-radius:var(–r2);padding:10px 12px;font-size:13px;color:var(–red);margin-top:8px}
+.matchup-box{border:1px solid var(–border);border-radius:var(–r2);padding:14px;margin-bottom:8px;background:var(–bg2)}
+.matchup-box.best{border-color:var(–kf);background:#0a1a08}
+.result-pts{font-size:24px;font-weight:600;font-family:var(–mono);color:var(–accent)}
+.inner-tabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:12px}
+.inner-tab{padding:6px 12px;font-size:12px;border:1px solid var(–border);border-radius:20px;cursor:pointer;color:var(–text2);background:var(–bg3)}
+.inner-tab.active{background:var(–accent);color:#111;border-color:var(–accent);font-weight:600}
+.list-row{background:var(–bg3);border:1px solid var(–border);border-radius:var(–r2);padding:12px;margin-bottom:8px}
+.nav-footer{display:flex;justify-content:space-between;align-items:center;margin-top:20px;padding-top:16px;border-top:1px solid var(–border)}
+.section-h{font-size:11px;font-weight:600;color:var(–text3);text-transform:uppercase;letter-spacing:.1em;margin:20px 0 10px}
+.eval-row{display:flex;align-items:flex-start;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(–border);gap:8px}
+.export-code{background:var(–bg);border:1px solid var(–border);border-radius:var(–r2);padding:12px;font-family:var(–mono);font-size:10px;word-break:break-all;max-height:120px;overflow-y:auto;margin-top:10px;color:var(–text3)}
+textarea.import-area{min-height:80px;font-size:13px;font-family:var(–mono)}
+</style>
+
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     TOPBAR
+══════════════════════════════════════════════════════════════════ -->
+
+<div class="topbar">
+  <!-- Mode dropdown -->
+  <div style="position:relative">
+    <button class="mode-btn" id="mode-btn" onclick="toggleModeDD()">
+      <span id="mode-label">Setup</span>
+      <span class="chevron">▾</span>
+    </button>
+    <div class="mode-dropdown" id="mode-dd">
+      <div class="mdrop-item cur" onclick="setMode('setup')"><span class="mdot"></span>Setup</div>
+      <div class="mdrop-item" onclick="setMode('turnier')"><span class="mdot"></span>Turnier</div>
+      <div class="mdrop-item" onclick="setMode('auswertung')"><span class="mdot"></span>Auswertung</div>
+    </div>
+  </div>
+
+  <!-- Round badge (turnier only) -->
+
+  <div style="position:relative" id="round-badge-wrap">
+    <div class="round-badge" id="round-badge" onclick="toggleRoundDD()">R1 ▾</div>
+    <div class="round-dropdown" id="round-dd">
+      <div class="rdrop-item cur" onclick="setRound(0)">Runde 1</div>
+      <div class="rdrop-item" onclick="setRound(1)">Runde 2</div>
+      <div class="rdrop-item" onclick="setRound(2)">Runde 3</div>
+      <div class="rdrop-item" onclick="setRound(3)">Runde 4</div>
+      <div class="rdrop-item" onclick="setRound(4)">Runde 5</div>
+    </div>
+  </div>
+
+  <!-- Burger menu -->
+
+  <div style="position:relative">
+    <button class="burger-btn" id="burger-btn" onclick="toggleBurger()">
+      <span></span><span></span><span></span>
+    </button>
+    <div class="burger-menu" id="burger-menu">
+      <div class="bmenu-item" onclick="doFullExport()">↑ Exportieren</div>
+      <div class="bmenu-item" onclick="showImportPanel()">↓ Importieren</div>
+      <div class="bmenu-item danger" onclick="confirmReset()">⚠ Reset</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     SETUP MODE
+══════════════════════════════════════════════════════════════════ -->
+
+<div class="mode-panel active" id="panel-setup">
+  <div class="subtabs" id="setup-subtabs">
+    <div class="stab active" onclick="goPhase(0)">1 · Team</div>
+    <div class="stab" onclick="goPhase(1)">2 · Listen</div>
+    <div class="stab" onclick="goPhase(2)">3 · Szenarien</div>
+    <div class="stab" onclick="goPhase(3)">4 · Meta & Matrix</div>
+    <div class="stab" onclick="goPhase(4)">5 · Portfolio</div>
+    <div class="stab" onclick="goPhase(5)">6 · Turnier-Teams</div>
+  </div>
+
+  <div class="content phase active" id="phase-0">
+    <div class="card">
+      <div class="card-title">Eure 4 Spieler</div>
+      <div id="player-inputs"></div>
+    </div>
+    <div class="nav-footer"><span></span><button class="btn btn-primary" onclick="goPhase(1)">Weiter →</button></div>
+  </div>
+
+  <div class="content phase" id="phase-1">
+    <div class="hint" style="margin-bottom:12px">Alle Listen die ihr in Betracht zieht. In Phase 4 wählt ihr die finale 5er-Kombi.</div>
+    <div id="candidate-list"></div>
+    <button class="btn btn-block" onclick="addCandidate()">+ Liste hinzufügen</button>
+    <div class="nav-footer">
+      <button class="btn" onclick="goPhase(0)">← Zurück</button>
+      <button class="btn btn-primary" onclick="goPhase(2)">Weiter →</button>
+    </div>
+  </div>
+
+  <div class="content phase" id="phase-2">
+    <div class="hint" style="margin-bottom:12px">Wähle die Szenarien die auf dem Turnier gespielt werden. Diese erscheinen dann in der Matchup-Matrix.</div>
+    <div id="scenario-pools"></div>
+    <div class="nav-footer">
+      <button class="btn" onclick="goPhase(1)">← Zurück</button>
+      <button class="btn btn-primary" onclick="goPhase(3)">Weiter →</button>
+    </div>
+  </div>
+
+  <div class="content phase" id="phase-3">
+    <div class="card">
+      <div class="card-title">Gegner-Listen (Meta)</div>
+      <div id="enemy-inputs"></div>
+      <button class="btn btn-sm" onclick="addEnemy()" style="margin-top:4px">+ Gegner hinzufügen</button>
+    </div>
+    <div class="section-h">Matchup-Matrix</div>
+    <div class="hint" style="margin-bottom:12px">Liste wählen → pro Gegner und Szenario bewerten.</div>
+    <div class="inner-tabs" id="matrix-list-tabs"></div>
+    <div id="matrix-content"></div>
+    <div class="nav-footer">
+      <button class="btn" onclick="goPhase(2)">← Zurück</button>
+      <button class="btn btn-primary" onclick="goPhase(4)">Weiter →</button>
+    </div>
+  </div>
+
+  <div class="content phase" id="phase-4">
+    <div class="card" style="display:flex;gap:10px;flex-wrap:wrap">
+      <div style="flex:1;min-width:120px">
+        <div class="label">Min. Szenarien ≥ 50/50</div>
+        <select id="filter-cats" onchange="renderPortfolio()">
+          <option value="1">mind. 1</option><option value="2" selected>mind. 2</option>
+          <option value="3">mind. 3</option><option value="4">mind. 4</option>
+        </select>
+      </div>
+      <div style="flex:1;min-width:120px">
+        <div class="label">Sortierung</div>
+        <select id="sort-mode" onchange="renderPortfolio()">
+          <option value="portfolio">Portfolio-Score</option>
+          <option value="avg">Ø Note</option>
+          <option value="coverage">Abdeckung</option>
+        </select>
+      </div>
+    </div>
+    <div id="portfolio-output"></div>
+    <div class="nav-footer">
+      <button class="btn" onclick="goPhase(3)">← Zurück</button>
+      <button class="btn btn-primary" onclick="goPhase(5)">Weiter →</button>
+    </div>
+  </div>
+
+  <div class="content phase" id="phase-5">
+    <div class="hint" style="margin-bottom:12px">Teams die ihr vor dem Turnier kennt. Listen aus Meta-Listen wählen oder manuell eingeben.</div>
+    <div id="tourney-teams"></div>
+    <button class="btn btn-block" onclick="addTourneyTeam()">+ Team hinzufügen</button>
+    <div class="nav-footer">
+      <button class="btn" onclick="goPhase(4)">← Zurück</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     TURNIER MODE
+══════════════════════════════════════════════════════════════════ -->
+
+<div class="mode-panel" id="panel-turnier">
+  <div class="subtabs" id="turnier-subtabs">
+    <div class="stab active" onclick="showView('runde')">Runde</div>
+    <div class="stab" onclick="showView('strike')">2a · Streichen</div>
+    <div class="stab" onclick="showView('attack')">2b · Angreifer</div>
+    <div class="stab" onclick="showView('decision')">3 · Paarung</div>
+    <div class="stab" onclick="showView('results')">Ergebnisse</div>
+  </div>
+
+  <div class="content view active" id="view-runde">
+    <div class="card">
+      <div class="card-title">Runde einrichten</div>
+      <div class="label" style="margin-bottom:6px">Szenario</div>
+      <select id="round-cat" onchange="R().scenario=this.value;save();renderStrike();renderAttack()">
+        <option value="">– wählen –</option>
+      </select>
+      <div class="divider"></div>
+      <div class="label" style="margin-bottom:6px">Bekanntes Gegner-Team (optional)</div>
+      <select id="team-select" onchange="selectTeam(this.value)">
+        <option value="">– manuell –</option>
+      </select>
+      <div style="margin-top:8px">
+        <div class="label" style="margin-bottom:4px">Teamname</div>
+        <input type="text" id="opp-name" placeholder="Gegner-Team…" oninput="R().oppName=this.value;save()">
+      </div>
+    </div>
+  </div>
+
+  <div class="content view" id="view-strike">
+    <div class="card">
+      <div class="card-title">Gegner-Listen</div>
+      <div id="opp-lists-input"></div>
+      <div class="divider"></div>
+      <div class="label" style="margin-bottom:6px">Gegner streicht</div>
+      <select id="opp-strike-sel" onchange="R().oppStruck=this.value;save()">
+        <option value="">– wählen –</option>
+      </select>
+    </div>
+    <div class="card">
+      <div class="card-title">Wir streichen – Empfehlung</div>
+      <div id="strike-rec"></div>
+      <div class="divider"></div>
+      <div class="label" style="margin-bottom:6px">Wir streichen</div>
+      <select id="my-strike-sel" onchange="R().myStruck=this.value;save();renderAttack()">
+        <option value="">– wählen –</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="content view" id="view-attack">
+    <div class="card">
+      <div class="card-title">Angreifer-Empfehlung</div>
+      <div id="attack-rec"></div>
+      <div class="divider"></div>
+      <div class="hint">
+        <strong style="color:var(--text2)">Checklist:</strong><br>
+        · Hat der Gegner eine Liste die euren Angreifer klar schlägt?<br>
+        · Welche Pool-Liste profitiert wenn der Angreifer ein bestimmtes Matchup zieht?<br>
+        · Keine spezialisierte Konter-Liste als Angreifer exponieren.
+      </div>
+    </div>
+  </div>
+
+  <div class="content view" id="view-decision">
+    <div class="card">
+      <div class="card-title">Doppelentscheidung</div>
+      <div class="label" style="margin-bottom:6px">Unser Angreifer</div>
+      <select id="d-attacker" onchange="R().attacker=this.value;save();renderDecision()"><option value="">– wählen –</option></select>
+      <div class="divider"></div>
+      <div class="label" style="margin-bottom:6px">Unser Pool-Spieler</div>
+      <select id="d-pool" onchange="R().pool=this.value;save();renderDecision()"><option value="">– wählen –</option></select>
+      <div class="divider"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div>
+          <div class="label">Gegner-Verteidiger A</div>
+          <select id="d-def-a" onchange="R().defA=this.value;save();renderDecision()"><option value="">– wählen –</option></select>
+        </div>
+        <div>
+          <div class="label">Gegner-Verteidiger B</div>
+          <select id="d-def-b" onchange="R().defB=this.value;save();renderDecision()"><option value="">– wählen –</option></select>
+        </div>
+      </div>
+    </div>
+    <div id="decision-detail" style="display:none">
+      <div class="card">
+        <div class="card-title" id="decision-cat-label">Matchup-Einschätzungen</div>
+        <div id="d-m-inputs"></div>
+      </div>
+      <div id="d-result"></div>
+    </div>
+  </div>
+
+  <div class="content view" id="view-results">
+    <div class="hint" style="margin-bottom:12px">Punkte eintragen. Sieg/Niederlage wird automatisch ermittelt.</div>
+    <div id="results-content"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     AUSWERTUNG MODE
+══════════════════════════════════════════════════════════════════ -->
+
+<div class="mode-panel" id="panel-auswertung">
+  <div class="subtabs">
+    <div class="stab active" onclick="showAuswTab('uebersicht')">Übersicht</div>
+    <div class="stab" onclick="showAuswTab('matchups')">Matchup-Analyse</div>
+  </div>
+  <div class="content view active" id="ausw-uebersicht">
+    <div id="eval-uebersicht"></div>
+  </div>
+  <div class="content view" id="ausw-matchups">
+    <div id="eval-matchups"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     IMPORT OVERLAY
+══════════════════════════════════════════════════════════════════ -->
+
+<div id="import-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:500;padding:24px;align-items:center;justify-content:center">
+  <div class="card" style="max-width:480px;width:100%;margin:0 auto">
+    <div class="card-title">Importieren</div>
+    <div class="hint" style="margin-bottom:10px">Backup-Code einfügen. Achtung: überschreibt alle aktuellen Daten.</div>
+    <textarea class="import-area" id="import-code" placeholder="Code hier einfügen..."></textarea>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn btn-primary" onclick="doImport()">Importieren</button>
+      <button class="btn" onclick="closeImport()">Abbrechen</button>
+    </div>
+    <div id="import-status"></div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+// CONSTANTS
+// ══════════════════════════════════════════════════════════════════
+const ALL_SCENARIOS=[
+  {pool:1,name:'Domination'},{pool:1,name:'Capture & Control'},{pool:1,name:'Breakthrough'},{pool:1,name:'Stake a Claim'},
+  {pool:2,name:'To the Death'},{pool:2,name:'Lords of Battle'},{pool:2,name:'Assassination'},{pool:2,name:'Contest of Champions'},
+  {pool:3,name:'Hold Ground'},{pool:3,name:'Heirloom of Ancient Power'},{pool:3,name:'Sites of Power'},{pool:3,name:'Command the Battlefield'},
+  {pool:4,name:'Destroy the Supplies'},{pool:4,name:'Retrieval'},{pool:4,name:'Seize the Prizes'},{pool:4,name:'Treasure Hoard'},
+  {pool:5,name:'Reconnoitre'},{pool:5,name:'Storm the Camp'},{pool:5,name:'Divide & Conquer'},{pool:5,name:'Escort the Wounded'},
+  {pool:6,name:'Fog of War'},{pool:6,name:'Clash by Moonlight'},{pool:6,name:'Lead from the Front'},{pool:6,name:'Convergence'},
+];
+function getActiveSzenarien(){return(G.scenarios||[]).filter(n=>ALL_SCENARIOS.find(s=>s.name===n));}
+// Legacy shims so existing code still works
+function CATS_arr(){return getActiveSzenarien();}
+function CATS_S_arr(){return getActiveSzenarien().map(n=>n.length>12?n.slice(0,10)+'…':n);}
+const RATINGS=[
+  {val:'kf',label:'++',pts:1.8},
+  {val:'lf',label:'+',pts:1.35},
+  {val:'50',label:'0',pts:1.0},
+  {val:'lu',label:'−',pts:0.65},
+  {val:'ku',label:'−−',pts:0.2}
+];
+const SK='mesbg_v1';
+
+// ══════════════════════════════════════════════════════════════════
+// STATE — single shared object
+// ══════════════════════════════════════════════════════════════════
+let G={
+  // Setup
+  players:['','','',''],
+  candidates:[],
+  enemies:[],
+  matrix:{},
+  selectedCombo:null,
+  tourneyTeams:[],
+  scenarios:[], // selected scenario names
+  // Turnier
+  currentRound:0,
+  rounds:Array(5).fill(null).map(()=>({
+    scenario:'',oppName:'',oppLists:['','','','',''],oppStruck:'',myStruck:'',
+    attacker:'',pool:'',defA:'',defB:'',mRatings:{},
+    matchups:Array(4).fill(null).map(()=>({myList:'',oppList:'',myPts:null,oppPts:null}))
+  }))
+};
+
+let currentMode='setup';
+let currentPhaseIdx=0;
+let currentViewId='runde';
+let matrixTab=0;
+
+// ══════════════════════════════════════════════════════════════════
+// PERSISTENCE
+// ══════════════════════════════════════════════════════════════════
+function save(){localStorage.setItem(SK,JSON.stringify(G));}
+function load(){
+  try{const d=JSON.parse(localStorage.getItem(SK)||'{}');
+    if(d.players)G.players=d.players;
+    if(d.candidates)G.candidates=d.candidates;
+    if(d.enemies)G.enemies=d.enemies;
+    if(d.matrix)G.matrix=d.matrix;
+    if(d.selectedCombo!==undefined)G.selectedCombo=d.selectedCombo;
+    if(d.tourneyTeams)G.tourneyTeams=d.tourneyTeams;
+    if(d.scenarios)G.scenarios=d.scenarios;
+    if(d.currentRound!==undefined)G.currentRound=d.currentRound;
+    if(d.rounds)G.rounds=d.rounds;
+  }catch(e){}
+}
+
+function confirmReset(){
+  closeBurger();
+  if(confirm('Alle Daten löschen?')){localStorage.removeItem(SK);location.reload();}
+}
+
+function doFullExport(){
+  closeBurger();
+  const b64=btoa(unescape(encodeURIComponent(JSON.stringify(G))));
+  const el=document.createElement('textarea');
+  el.value=b64;el.style.position='fixed';el.style.opacity='0';
+  document.body.appendChild(el);el.select();
+  document.execCommand('copy');document.body.removeChild(el);
+  navigator.clipboard?.writeText(b64);
+  alert('Export-Code in Zwischenablage kopiert!');
+}
+
+function showImportPanel(){closeBurger();document.getElementById('import-overlay').style.display='flex';}
+function closeImport(){document.getElementById('import-overlay').style.display='none';}
+
+function doImport(){
+  const code=document.getElementById('import-code').value.trim();
+  const status=document.getElementById('import-status');
+  try{
+    const d=JSON.parse(decodeURIComponent(escape(atob(code))));
+    Object.assign(G,d);save();
+    status.innerHTML='<div class="box-ok">Importiert ✓</div>';
+    setTimeout(()=>{closeImport();location.reload();},800);
+  }catch(e){status.innerHTML='<div class="box-err">Ungültiger Code.</div>';}
+}
+
+// ══════════════════════════════════════════════════════════════════
+// TOPBAR MENUS
+// ══════════════════════════════════════════════════════════════════
+function toggleModeDD(){
+  const dd=document.getElementById('mode-dd');
+  const btn=document.getElementById('mode-btn');
+  dd.classList.toggle('open');btn.classList.toggle('open');
+  if(dd.classList.contains('open'))closeBurger();
+}
+function toggleBurger(){
+  document.getElementById('burger-menu').classList.toggle('open');
+  if(document.getElementById('burger-menu').classList.contains('open'))closeModeDD();
+}
+function closeModeDD(){
+  document.getElementById('mode-dd').classList.remove('open');
+  document.getElementById('mode-btn').classList.remove('open');
+}
+function closeBurger(){document.getElementById('burger-menu').classList.remove('open');}
+function toggleRoundDD(){document.getElementById('round-dd').classList.toggle('open');}
+
+document.addEventListener('click',e=>{
+  if(!e.target.closest('#mode-btn')&&!e.target.closest('#mode-dd'))closeModeDD();
+  if(!e.target.closest('#burger-btn')&&!e.target.closest('#burger-menu'))closeBurger();
+  if(!e.target.closest('#round-badge')&&!e.target.closest('#round-dd'))
+    document.getElementById('round-dd').classList.remove('open');
+});
+
+function setMode(mode){
+  closeModeDD();
+  currentMode=mode;
+  document.querySelectorAll('.mode-panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('panel-'+mode).classList.add('active');
+  document.getElementById('mode-label').textContent={setup:'Setup',turnier:'Turnier',auswertung:'Auswertung'}[mode];
+  document.querySelectorAll('.mdrop-item').forEach((el,i)=>{
+    el.classList.toggle('cur',['setup','turnier','auswertung'][i]===mode);
+  });
+  document.getElementById('round-badge-wrap').style.display=mode==='turnier'?'block':'none';
+  if(mode==='turnier'){updateRoundBadge();renderTeamSelect();renderMyListSelects();renderStrike();renderAttack();}
+  if(mode==='auswertung')renderAuswertung();
+  window.scrollTo(0,0);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// HELPERS
+// ══════════════════════════════════════════════════════════════════
+function mkey(li,ei,ci){return`${li}_${ei}_${ci}`;}
+function getPts(r){return RATINGS.find(x=>x.val===r)?.pts??1.0;}
+function getR(li,ei,ci){return G.matrix[mkey(li,ei,ci)]||'50';}
+function getVC(){return G.candidates.filter(c=>c.name.trim());}
+function getVE(){return G.enemies.filter(e=>e.trim());}
+function getAP(){return G.players.map((p,i)=>({p,i})).filter(x=>x.p.trim());}
+function R(){return G.rounds[G.currentRound];}
+
+function avgForCand(li,ci){
+  const ve=getVE();if(!ve.length)return 1.0;
+  return ve.reduce((s,e,idx)=>s+getPts(getR(li,G.enemies.indexOf(e),ci)),0)/ve.length;
+}
+function avgForList(li,ci){
+  const ve=G.enemies.filter(e=>e.trim());if(!ve.length)return 1.0;
+  return ve.reduce((s,_,ei)=>s+getPts(getR(li,ei,ci)),0)/ve.length;
+}
+function chipCls(pts){if(pts>=1.6)return'kf';if(pts>=1.15)return'lf';if(pts>=0.85)return'50';if(pts>=0.4)return'lu';return'ku';}
+function chipLbl(c){return{kf:'++',lf:'+','50':'0',lu:'−',ku:'−−'}[c];}
+
+function rSel(id,val,onch){
+  return`<select class="rating-sel r-${val}" id="${id}" onchange="${onch};this.className='rating-sel r-'+this.value">
+    ${RATINGS.map(r=>`<option value="${r.val}"${val===r.val?' selected':''}>${r.label}</option>`).join('')}
+  </select>`;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// SETUP — Phase navigation
+// ══════════════════════════════════════════════════════════════════
+function goPhase(idx){
+  document.querySelectorAll('#panel-setup .phase').forEach((p,i)=>p.classList.toggle('active',i===idx));
+  document.querySelectorAll('#setup-subtabs .stab').forEach((t,i)=>t.classList.toggle('active',i===idx));
+  currentPhaseIdx=idx;
+  if(idx===1)renderCandidates();
+  if(idx===2)renderScenarios();
+  if(idx===3){renderEnemies();renderMatrixTabs();}
+  if(idx===4)renderPortfolio();
+  if(idx===5)renderTourneyTeams();
+  window.scrollTo(0,0);
+}
+
+// Scenarios
+function renderScenarios(){
+  const pools=[1,2,3,4,5,6];
+  const active=G.scenarios||[];
+  let html='';
+  pools.forEach(p=>{
+    const sc=ALL_SCENARIOS.filter(s=>s.pool===p);
+    html+=`<div class="card" style="margin-bottom:10px">
+      <div class="card-title" style="margin-bottom:10px">Pool ${p}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        ${sc.map(s=>{
+          const on=active.includes(s.name);
+          return`<button onclick="toggleScenario('${s.name}')"
+            style="padding:6px 12px;font-size:12px;border:1px solid ${on?'var(--accent)':'var(--border)'};border-radius:20px;cursor:pointer;background:${on?'var(--accent)':'var(--bg3)'};color:${on?'#111':'var(--text2)'};font-weight:${on?'600':'400'}">
+            ${s.name}
+          </button>`;
+        }).join('')}
+      </div>
+    </div>`;
+  });
+  const n=active.length;
+  html+=`<div class="hint" style="margin-top:4px">${n} Szenario${n!==1?'s':''} gewählt</div>`;
+  document.getElementById('scenario-pools').innerHTML=html;
+}
+function toggleScenario(name){
+  if(!G.scenarios)G.scenarios=[];
+  const idx=G.scenarios.indexOf(name);
+  if(idx>=0)G.scenarios.splice(idx,1);else G.scenarios.push(name);
+  save();renderScenarios();
+}
+
+// Players
+function renderPlayers(){
+  document.getElementById('player-inputs').innerHTML=G.players.map((p,i)=>`
+    <div class="row">
+      <span class="hint" style="min-width:70px">Spieler ${i+1}</span>
+      <input type="text" value="${p}" placeholder="Name..." oninput="G.players[${i}]=this.value;save()">
+    </div>`).join('');
+}
+
+// Candidates
+function addCandidate(){G.candidates.push({name:'',players:[]});save();renderCandidates();}
+function renderCandidates(){
+  const ap=getAP();
+  document.getElementById('candidate-list').innerHTML=G.candidates.map((c,i)=>`
+    <div class="list-row">
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <input type="text" value="${c.name}" placeholder="Listenname..." style="flex:1"
+          oninput="G.candidates[${i}].name=this.value;save();renderMatrixTabs()">
+        <button class="btn btn-sm btn-danger" onclick="G.candidates.splice(${i},1);save();renderCandidates();renderMatrixTabs()">×</button>
+      </div>
+      <div class="label" style="margin-bottom:6px">Spieler</div>
+      <div class="player-toggles">
+        ${ap.map(({p,i:pi})=>`<button class="ptoggle${c.players.includes(pi)?' on':''}" onclick="toggleCP(${i},${pi})">${p}</button>`).join('')}
+      </div>
+    </div>`).join('');
+}
+function toggleCP(ci,pi){
+  const idx=G.candidates[ci].players.indexOf(pi);
+  if(idx>=0)G.candidates[ci].players.splice(idx,1);else G.candidates[ci].players.push(pi);
+  save();renderCandidates();
+}
+
+// Enemies + Matrix
+function addEnemy(){G.enemies.push('');save();renderEnemies();renderMatrixTabs();}
+function renderEnemies(){
+  document.getElementById('enemy-inputs').innerHTML=G.enemies.map((e,i)=>`
+    <div class="row">
+      <input type="text" value="${e}" placeholder="z.B. Mordor Ringwraiths..."
+        oninput="G.enemies[${i}]=this.value;save();renderMatrixContent()">
+      <button class="btn btn-sm btn-danger" onclick="G.enemies.splice(${i},1);save();renderEnemies();renderMatrixContent()">×</button>
+    </div>`).join('');
+}
+function renderMatrixTabs(){
+  const vc=getVC();if(matrixTab>=vc.length)matrixTab=0;
+  document.getElementById('matrix-list-tabs').innerHTML=vc.map((c,ti)=>`
+    <div class="inner-tab${ti===matrixTab?' active':''}" onclick="matrixTab=${ti};renderMatrixTabs()">${c.name||'Liste '+(ti+1)}</div>`).join('');
+  renderMatrixContent();
+}
+function renderMatrixContent(){
+  const vc=getVC();const ve=getVE();const wrap=document.getElementById('matrix-content');
+  const sc=getActiveSzenarien();
+  if(!vc.length){wrap.innerHTML='<p class="hint">Erst Listen in Phase 2.</p>';return;}
+  if(!ve.length){wrap.innerHTML='<p class="hint">Erst Gegner-Listen oben eintragen.</p>';return;}
+  if(!sc.length){wrap.innerHTML='<p class="hint">Erst Szenarien in Phase 3 wählen.</p>';return;}
+  if(matrixTab>=vc.length)matrixTab=0;
+  const c=vc[matrixTab];const li=G.candidates.indexOf(c);
+  let html='<div class="matrix-wrap"><table class="matrix-table"><thead><tr><th class="rh">Gegner</th>';
+  sc.forEach(s=>html+=`<th style="min-width:80px">${s.length>12?s.slice(0,11)+'…':s}</th>`);
+  html+='</tr></thead><tbody>';
+  ve.forEach(e=>{
+    const ei=G.enemies.indexOf(e);
+    html+=`<tr><td style="font-size:12px;padding:6px 4px;color:var(--text2);white-space:nowrap">${e}</td>`;
+    sc.forEach((_,ci)=>{
+      const key=mkey(li,ei,ci);const val=G.matrix[key]||'50';
+      html+=`<td>${rSel(`mx_${li}_${ei}_${ci}`,val,`G.matrix['${key}']=this.value;save()`)}</td>`;
+    });
+    html+='</tr>';
+  });
+  html+='</tbody></table></div>';wrap.innerHTML=html;
+}
+
+// Portfolio
+function getCombinations(arr,k){
+  if(k===0)return[[]];if(arr.length<k)return[];
+  const[f,...r]=arr;
+  return[...getCombinations(r,k-1).map(c=>[f,...c]),...getCombinations(r,k)];
+}
+function scoreCombo(combo){
+  const sc=getActiveSzenarien();
+  const n=sc.length||1;
+  const catAvgs=sc.map((_,ci)=>{
+    const avgs=combo.map(c=>avgForCand(G.candidates.indexOf(c),ci));
+    return avgs.reduce((a,b)=>a+b,0)/avgs.length;
+  });
+  const overall=catAvgs.length?catAvgs.reduce((a,b)=>a+b,0)/n:1.0;
+  const above=catAvgs.filter(a=>a>=1.0).length;
+  const minC=catAvgs.length?Math.min(...catAvgs):1.0;
+  return{catAvgs,sc,overall,above,minC,score:overall*0.5+minC*0.3+(n?above/n:0)*0.2*1.8};
+}
+function renderPortfolio(){
+  const out=document.getElementById('portfolio-output');
+  const vc=getVC();const ap=getAP();const sc=getActiveSzenarien();
+  if(vc.length<5){out.innerHTML='<div class="box-warn">Mind. 5 Listen in Phase 2.</div>';return;}
+  if(!sc.length){out.innerHTML='<div class="box-warn">Erst Szenarien in Phase 3 wählen.</div>';return;}
+  const allC=getCombinations(vc,5);
+  const valid=allC.filter(combo=>{
+    const cov=new Set(combo.flatMap(c=>c.players));
+    return ap.every(({i})=>cov.has(i));
+  });
+  if(!valid.length){out.innerHTML='<div class="box-err">Keine gültige Kombi – Spieler-Zuordnungen prüfen.</div>';return;}
+  const minC=parseInt(document.getElementById('filter-cats').value);
+  const sm=document.getElementById('sort-mode').value;
+  let scored=valid.map(combo=>({combo,s:scoreCombo(combo)})).filter(({s})=>s.above>=minC);
+  if(!scored.length){out.innerHTML='<div class="box-warn">Kein Ergebnis – Filter lockern?</div>';return;}
+  if(sm==='portfolio')scored.sort((a,b)=>b.s.score-a.s.score);
+  else if(sm==='avg')scored.sort((a,b)=>b.s.overall-a.s.overall);
+  else scored.sort((a,b)=>b.s.above-a.s.above);
+  const topN=Math.min(10,scored.length);const best=scored[0].s.score;
+  let html=`<p class="hint" style="margin:10px 0">${scored.length} gültige Kombis · Top ${topN}</p>`;
+  scored.slice(0,topN).forEach(({combo,s},rank)=>{
+    const idxArr=combo.map(c=>G.candidates.indexOf(c));
+    const isPicked=G.selectedCombo&&idxArr.every((x,i)=>G.selectedCombo[i]===x);
+    const pct=Math.round(s.score/best*100);
+    // show top 4 scenarios by spread for coverage grid
+    const showSc=s.sc.slice(0,Math.min(4,s.sc.length));
+    html+=`<div class="combo-card${isPicked?' picked':''}" onclick="pickCombo(${JSON.stringify(idxArr)})">
+      <div style="display:flex;justify-content:space-between;align-items:baseline">
+        <span style="font-size:12px;color:var(--text3);font-family:var(--mono)">#${rank+1}</span>
+        <span class="combo-score-num">${s.score.toFixed(2)}</span>
+      </div>
+      <div class="score-bar"><div class="score-fill" style="width:${pct}%"></div></div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px">${combo.map(c=>`<span class="tag">${c.name}</span>`).join('')}</div>
+      <div class="cov-grid" style="grid-template-columns:repeat(${Math.min(4,showSc.length)},1fr)">${showSc.map((name,ci)=>{
+        const avg=s.catAvgs[ci];const cls=avg>=1.35?'cov-good':avg>=0.85?'cov-mid':'cov-bad';
+        const short=name.length>10?name.slice(0,9)+'…':name;
+        return`<div class="cov-cell ${cls}">${short}<br><strong>${avg.toFixed(2)}</strong></div>`;
+      }).join('')}</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:6px;font-family:var(--mono)">Ø${s.overall.toFixed(2)} · min${s.minC.toFixed(2)} · ${s.above}/${s.sc.length}≥50/50</div>
+      ${isPicked?'<div style="font-size:12px;color:var(--accent);margin-top:8px;font-weight:600">✓ Gewählt</div>':''}
+    </div>`;
+  });
+  out.innerHTML=html;
+}
+function pickCombo(idxArr){G.selectedCombo=idxArr;save();renderPortfolio();}
+
+// Tourney Teams
+function addTourneyTeam(){
+  G.tourneyTeams.push({name:'',lists:Array(5).fill(null).map(()=>({type:'meta',val:'',manual:''})),ratings:{}});
+  save();renderTourneyTeams();
+}
+function getMetaOpts(sel){
+  return`<option value="">– Meta-Liste –</option>`+
+    getVE().map(e=>`<option value="${e}"${sel===e?' selected':''}>${e}</option>`).join('')+
+    `<option value="__manual__"${sel==='__manual__'?' selected':''}>✎ Manuell…</option>`;
+}
+function onTTListChange(ti,li,val){
+  G.tourneyTeams[ti].lists[li]={type:val==='__manual__'?'manual':'meta',val:val==='__manual__'?'':val,manual:''};
+  save();renderTourneyTeams();
+}
+function getTTName(l){
+  if(!l||typeof l==='string')return l||'';
+  return l.type==='manual'?l.manual||'':l.val||'';
+}
+function renderTourneyTeams(){
+  const wrap=document.getElementById('tourney-teams');
+  if(!G.tourneyTeams.length){wrap.innerHTML='<p class="hint" style="margin-bottom:12px">Noch keine Teams.</p>';return;}
+  G.tourneyTeams.forEach(t=>{t.lists=t.lists.map(l=>typeof l==='string'?{type:'meta',val:l,manual:''}:l);});
+  wrap.innerHTML=G.tourneyTeams.map((team,ti)=>`
+    <div class="card">
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <input type="text" value="${team.name}" placeholder="Teamname..." style="flex:1;font-weight:500"
+          oninput="G.tourneyTeams[${ti}].name=this.value;save()">
+        <button class="btn btn-sm btn-danger" onclick="G.tourneyTeams.splice(${ti},1);save();renderTourneyTeams()">×</button>
+      </div>
+      <div class="label" style="margin-bottom:8px">5 Listen</div>
+      ${team.lists.map((l,li)=>`
+        <div style="margin-bottom:8px">
+          <select onchange="onTTListChange(${ti},${li},this.value)">${getMetaOpts(l.type==='manual'?'__manual__':l.val)}</select>
+          ${l.type==='manual'?`<input type="text" value="${l.manual||''}" placeholder="Listenname…" style="margin-top:6px"
+            oninput="G.tourneyTeams[${ti}].lists[${li}].manual=this.value;save()">`:''}</div>`).join('')}
+      <div class="divider"></div>
+      <div class="label" style="margin-bottom:6px">Matchup-Einschätzungen</div>
+      <div id="tt-mx-${ti}"></div>
+    </div>`).join('');
+  G.tourneyTeams.forEach((_,ti)=>renderTTMx(ti));
+}
+function renderTTMx(ti){
+  const wrap=document.getElementById(`tt-mx-${ti}`);if(!wrap)return;
+  const team=G.tourneyTeams[ti];
+  const validOpp=team.lists.map(l=>getTTName(l)).filter(l=>l.trim());
+  if(!validOpp.length||!G.selectedCombo){wrap.innerHTML='<p class="hint">Erst finale 5 in Phase 4 wählen.</p>';return;}
+  const myLists=G.selectedCombo.map(i=>G.candidates[i]).filter(Boolean);
+  let html='<div class="matrix-wrap"><table class="matrix-table"><thead><tr><th class="rh">Unsere Liste</th>';
+  CATS_S.forEach(c=>html+=`<th>${c}</th>`);html+='</tr></thead><tbody>';
+  myLists.forEach((myC,mli)=>{
+    const li=G.candidates.indexOf(myC);
+    validOpp.forEach((tl,tli)=>{
+      const ei=G.enemies.indexOf(tl);const known=ei>=0;
+      html+=`<tr><td style="font-size:10px;color:var(--text2);padding:4px;line-height:1.3">
+        <span style="color:var(--text)">${myC.name}</span><br>vs ${tl}
+        ${known?'<span class="chip chip-lf" style="font-size:9px;padding:1px 4px">bekannt</span>':''}
+      </td>`;
+      CATS.forEach((_,ci)=>{
+        if(known){
+          const v=getR(li,ei,ci);
+          html+=`<td style="text-align:center"><span class="chip chip-${v}">${chipLbl(v)}</span></td>`;
+        } else {
+          if(!team.ratings)team.ratings={};
+          if(!team.ratings[myC.name])team.ratings[myC.name]={};
+          if(!team.ratings[myC.name][tl])team.ratings[myC.name][tl]=Array(4).fill('50');
+          const v=team.ratings[myC.name][tl][ci]||'50';
+          html+=`<td>${rSel(`tt_${ti}_${mli}_${tli}_${ci}`,v,`updTTR(${ti},'${myC.name}','${tl}',${ci},this.value)`)}</td>`;
+        }
+      });
+      html+='</tr>';
+    });
+  });
+  html+='</tbody></table></div>';wrap.innerHTML=html;
+}
+function updTTR(ti,ml,el,ci,val){
+  if(!G.tourneyTeams[ti].ratings)G.tourneyTeams[ti].ratings={};
+  if(!G.tourneyTeams[ti].ratings[ml])G.tourneyTeams[ti].ratings[ml]={};
+  if(!G.tourneyTeams[ti].ratings[ml][el])G.tourneyTeams[ti].ratings[ml][el]=Array(4).fill('50');
+  G.tourneyTeams[ti].ratings[ml][el][ci]=val;save();
+}
+
+// ══════════════════════════════════════════════════════════════════
+// TURNIER
+// ══════════════════════════════════════════════════════════════════
+function showView(id){
+  document.querySelectorAll('#panel-turnier .view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('view-'+id).classList.add('active');
+  document.querySelectorAll('#turnier-subtabs .stab').forEach((t,i)=>
+    t.classList.toggle('active',['runde','strike','attack','decision','results'][i]===id));
+  currentViewId=id;
+  if(id==='runde'){
+    renderTeamSelect();
+    const r=R();
+    const sc=getActiveSzenarien();
+    const catEl=document.getElementById('round-cat');
+    if(catEl){
+      catEl.innerHTML='<option value="">– wählen –</option>'+sc.map(s=>`<option value="${s}"${r.scenario===s?' selected':''}>${s}</option>`).join('');
+    }
+    document.getElementById('opp-name').value=r.oppName||'';
+  }
+  if(id==='strike')renderStrike();
+  if(id==='attack')renderAttack();
+  if(id==='decision')renderDecisionSelects();
+  if(id==='results')renderResults();
+  window.scrollTo(0,0);
+}
+
+// Round
+function updateRoundBadge(){
+  const rb=document.getElementById('round-badge');
+  rb.style.display='block';
+  rb.textContent='R'+(G.currentRound+1)+' ▾';
+  document.querySelectorAll('#round-dd .rdrop-item').forEach((el,i)=>{
+    el.classList.toggle('cur',i===G.currentRound);
+    el.classList.toggle('done',G.rounds[i].matchups.some(m=>m.myPts!==null)&&i!==G.currentRound);
+  });
+}
+function setRound(i){
+  G.currentRound=i;save();
+  document.getElementById('round-dd').classList.remove('open');
+  updateRoundBadge();
+  const r=R();
+  const sc=getActiveSzenarien();
+  const catEl=document.getElementById('round-cat');
+  if(catEl){
+    catEl.innerHTML='<option value="">– wählen –</option>'+sc.map(s=>`<option value="${s}"${r.scenario===s?' selected':''}>${s}</option>`).join('');
+  }
+  const oppEl=document.getElementById('opp-name');if(oppEl)oppEl.value=r.oppName||'';
+  renderStrike();renderAttack();renderDecisionSelects();renderResults();
+}
+
+function renderTeamSelect(){
+  const sel=document.getElementById('team-select');if(!sel)return;
+  sel.innerHTML='<option value="">– manuell –</option>'+
+    G.tourneyTeams.filter(t=>t.name.trim()).map((t,i)=>`<option value="${i}">${t.name}</option>`).join('');
+}
+function selectTeam(val){
+  if(val==='')return;
+  const team=G.tourneyTeams[parseInt(val)];if(!team)return;
+  const r=R();
+  r.oppName=team.name;
+  r.oppLists=team.lists.map(l=>getTTName(l)).concat(['','','','','']).slice(0,5);
+  document.getElementById('opp-name').value=team.name;
+  save();renderStrike();
+}
+
+function renderMyListSelects(){
+  const opts='<option value="">– wählen –</option>'+G.candidates.filter(c=>c.name.trim()).map((c,i)=>{
+    const realIdx=G.candidates.indexOf(c);
+    return`<option value="${realIdx}">${c.name}</option>`;
+  }).join('');
+  // Use selectedCombo list names for turnier
+  const myLists=G.selectedCombo?G.selectedCombo.map(i=>G.candidates[i]).filter(Boolean):[];
+  const listOpts='<option value="">– wählen –</option>'+myLists.map((c,i)=>`<option value="${i}">${c.name}</option>`).join('');
+  ['d-attacker','d-pool'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML=listOpts;});
+  const msSel=document.getElementById('my-strike-sel');
+  if(msSel)msSel.innerHTML='<option value="">– wählen –</option>'+myLists.map((c,i)=>`<option value="${i}">${c.name}</option>`).join('');
+}
+
+// Strike
+function renderStrike(){
+  if(!G.selectedCombo)return;
+  const r=R();
+  const sc=getActiveSzenarien();
+  const ci=sc.indexOf(r.scenario||'');
+  const myLists=G.selectedCombo.map(i=>G.candidates[i]).filter(Boolean);
+
+  document.getElementById('opp-lists-input').innerHTML=r.oppLists.map((l,i)=>`
+    <div class="row">
+      <input type="text" value="${l}" placeholder="Gegner-Liste ${i+1}…"
+        oninput="G.rounds[${G.currentRound}].oppLists[${i}]=this.value;save();updateOppStrikeOpts();renderDecisionSelects()">
+    </div>`).join('');
+  updateOppStrikeOpts();
+
+  const scores=myLists.map((c,li)=>({name:c.name,li,avg:avgForList(G.selectedCombo[li],ci)}));
+  const minAvg=Math.min(...scores.map(s=>s.avg));
+  document.getElementById('strike-rec').innerHTML=
+    [...scores].sort((a,b)=>a.avg-b.avg).map(s=>{
+      const cls=chipCls(s.avg);const isW=Math.abs(s.avg-minAvg)<0.001;
+      return`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:13px">${s.name}</span>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span class="chip chip-${cls}">${chipLbl(cls)}</span>
+          <span style="font-size:11px;font-family:var(--mono);color:var(--text3)">${s.avg.toFixed(2)}</span>
+          ${isW?'<span style="font-size:10px;color:var(--yellow);border:1px solid var(--yellow);border-radius:4px;padding:1px 5px">streichen?</span>':''}
+        </div>
+      </div>`;
+    }).join('');
+
+  const mySel=document.getElementById('my-strike-sel');
+  if(mySel){
+    const myStruck=r.myStruck!==''?parseInt(r.myStruck):-1;
+    mySel.innerHTML='<option value="">– wählen –</option>'+
+      myLists.map((c,i)=>`<option value="${i}"${myStruck===i?' selected':''}>${c.name}</option>`).join('');
+  }
+  renderAttack();
+}
+function updateOppStrikeOpts(){
+  const r=R();const valid=r.oppLists.filter(l=>l.trim());
+  const sel=document.getElementById('opp-strike-sel');
+  if(sel)sel.innerHTML='<option value="">– wählen –</option>'+valid.map(l=>`<option value="${l}"${r.oppStruck===l?' selected':''}>${l}</option>`).join('');
+}
+
+// Attack
+function renderAttack(){
+  if(!G.selectedCombo)return;
+  const r=R();
+  const sc=getActiveSzenarien();
+  const ci=sc.indexOf(r.scenario||'');
+  const myStruck=r.myStruck!==''?parseInt(r.myStruck):-1;
+  const myLists=G.selectedCombo.map(i=>G.candidates[i]).filter(Boolean);
+  const scores=myLists.map((c,i)=>({name:c.name,li:G.selectedCombo[i],localIdx:i,avg:avgForList(G.selectedCombo[i],ci)}))
+    .filter(s=>s.localIdx!==myStruck);
+  if(!scores.length){document.getElementById('attack-rec').innerHTML='<p class="hint">Erst streichen in 2a.</p>';return;}
+  const maxAvg=Math.max(...scores.map(s=>s.avg));
+  document.getElementById('attack-rec').innerHTML=
+    [...scores].sort((a,b)=>b.avg-a.avg).map(s=>{
+      const cls=chipCls(s.avg);const isBest=Math.abs(s.avg-maxAvg)<0.001;
+      return`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:13px;${isBest?'font-weight:600;color:var(--accent)':''}">${s.name}</span>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span class="chip chip-${cls}">${chipLbl(cls)}</span>
+          <span style="font-size:11px;font-family:var(--mono);color:var(--text3)">${s.avg.toFixed(2)}</span>
+          ${isBest?'<span style="font-size:10px;color:var(--accent);border:1px solid var(--accent);border-radius:4px;padding:1px 5px">angreifen?</span>':''}
+        </div>
+      </div>`;
+    }).join('');
+}
+
+// Decision
+function renderDecisionSelects(){
+  if(!G.selectedCombo)return;
+  const r=R();
+  const myLists=G.selectedCombo.map(i=>G.candidates[i]).filter(Boolean);
+  const myStruck=r.myStruck!==''?parseInt(r.myStruck):-1;
+  const available=myLists.filter((_,i)=>i!==myStruck);
+  const listOpts='<option value="">– wählen –</option>'+myLists.map((c,i)=>`<option value="${i}">${c.name}</option>`).join('');
+  const atkEl=document.getElementById('d-attacker');const poolEl=document.getElementById('d-pool');
+  if(atkEl){atkEl.innerHTML=listOpts;if(r.attacker!=='')atkEl.value=r.attacker;}
+  if(poolEl){poolEl.innerHTML=listOpts;if(r.pool!=='')poolEl.value=r.pool;}
+  const oppActive=r.oppLists.filter(l=>l.trim()&&l!==r.oppStruck);
+  const defOpts='<option value="">– wählen –</option>'+oppActive.map(l=>`<option value="${l}">${l}</option>`).join('');
+  const daEl=document.getElementById('d-def-a');const dbEl=document.getElementById('d-def-b');
+  if(daEl){daEl.innerHTML=defOpts;if(r.defA)daEl.value=r.defA;}
+  if(dbEl){dbEl.innerHTML=defOpts;if(r.defB)dbEl.value=r.defB;}
+  renderDecision();
+}
+
+function renderDecision(){
+  if(!G.selectedCombo)return;
+  const r=R();
+  const atkIdx=r.attacker!==''?parseInt(r.attacker):-1;
+  const poolIdx=r.pool!==''?parseInt(r.pool):-1;
+  const defA=r.defA||'';const defB=r.defB||'';
+  const detail=document.getElementById('decision-detail');
+  if(atkIdx<0||poolIdx<0||!defA||!defB||atkIdx===poolIdx){detail.style.display='none';return;}
+  detail.style.display='block';
+
+  const ci=getActiveSzenarien().indexOf(r.scenario||'');
+  const myLists=G.selectedCombo.map(i=>G.candidates[i]).filter(Boolean);
+  const atkName=myLists[atkIdx]?.name||'';const poolName=myLists[poolIdx]?.name||'';
+  const atkRealLi=G.selectedCombo[atkIdx];const poolRealLi=G.selectedCombo[poolIdx];
+
+  document.getElementById('decision-cat-label').textContent=`Matchup · ${r.scenario||'kein Szenario'}`;
+
+  function getKnown(realLi,oppName){
+    const ei=G.enemies.indexOf(oppName);
+    if(ei>=0)return getR(realLi,ei,ci);
+    for(const team of G.tourneyTeams){
+      const mn=G.candidates[realLi]?.name;
+      if(mn&&team.ratings?.[mn]?.[oppName]?.[ci])return team.ratings[mn][oppName][ci];
+    }
+    return null;
+  }
+
+  function mBlock(id,realLi,oppName,label){
+    const known=getKnown(realLi,oppName);
+    const cur=known||(r.mRatings[id]||'50');
+    if(known&&!r.mRatings[id])r.mRatings[id]=known;
+    let html=`<div class="label" style="margin-bottom:4px">${label}</div>`;
+    if(known)html+=`<div style="margin-bottom:6px"><span class="chip chip-${known}" style="padding:4px 8px">${RATINGS.find(x=>x.val===known)?.label} (Matrix)</span></div>`;
+    html+=`<select class="rating-sel r-${cur}" id="${id}"
+      onchange="G.rounds[${G.currentRound}].mRatings['${id}']=this.value;save();calcResult();this.className='rating-sel r-'+this.value">
+      ${RATINGS.map(rt=>`<option value="${rt.val}"${cur===rt.val?' selected':''}>${rt.label}</option>`).join('')}
+    </select>`;
+    return html;
+  }
+
+  document.getElementById('d-m-inputs').innerHTML=`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div>${mBlock('atk_a',atkRealLi,defA,`${atkName} vs ${defA}`)}</div>
+      <div>${mBlock('atk_b',atkRealLi,defB,`${atkName} vs ${defB}`)}</div>
+      <div>${mBlock('pool_b',poolRealLi,defB,`${poolName} vs ${defB} (auto wenn A)`)}</div>
+      <div>${mBlock('pool_a',poolRealLi,defA,`${poolName} vs ${defA} (auto wenn B)`)}</div>
+    </div>`;
+  calcResult();
+}
+
+function calcResult(){
+  const r=R();
+  const atkIdx=r.attacker!==''?parseInt(r.attacker):-1;
+  const poolIdx=r.pool!==''?parseInt(r.pool):-1;
+  if(atkIdx<0||poolIdx<0||!r.defA||!r.defB)return;
+  const myLists=G.selectedCombo.map(i=>G.candidates[i]).filter(Boolean);
+  const get=id=>getPts(r.mRatings[id]||'50');
+  const chooseA=get('atk_a')+get('pool_b');
+  const chooseB=get('atk_b')+get('pool_a');
+  const diff=Math.abs(chooseA-chooseB);const bestA=chooseA>=chooseB;
+  document.getElementById('d-result').innerHTML=`
+    <div class="matchup-box${bestA?' best':''}">
+      <div class="label">Angreifer → ${r.defA}</div>
+      <div class="result-pts">${chooseA.toFixed(2)} <span style="font-size:13px;font-weight:400;color:var(--text3)">erwartet</span></div>
+      <div class="hint">${myLists[atkIdx]?.name} vs ${r.defA} · ${myLists[poolIdx]?.name} vs ${r.defB} (auto)</div>
+    </div>
+    <div class="matchup-box${!bestA?' best':''}">
+      <div class="label">Angreifer → ${r.defB}</div>
+      <div class="result-pts">${chooseB.toFixed(2)} <span style="font-size:13px;font-weight:400;color:var(--text3)">erwartet</span></div>
+      <div class="hint">${myLists[atkIdx]?.name} vs ${r.defB} · ${myLists[poolIdx]?.name} vs ${r.defA} (auto)</div>
+    </div>
+    <div class="${diff>0.3?'box-ok':'box-warn'}">
+      ${diff>0.3?`Empfehlung: Angreifer gegen <strong>${bestA?r.defA:r.defB}</strong> (+${diff.toFixed(2)} Pkt)`:`Knappe Entscheidung (Δ${diff.toFixed(2)}) – Bluff entscheidet`}
+    </div>`;
+}
+
+// Results
+function renderResults(){
+  if(!G.selectedCombo)return;
+  const r=R();
+  const myLists=G.selectedCombo.map(i=>G.candidates[i]).filter(Boolean);
+  const oppAvail=r.oppLists.filter(l=>l.trim()&&l!==r.oppStruck);
+  let html='';
+  [0,1,2,3].forEach(mi=>{
+    const m=r.matchups[mi];
+    const myP=m.myPts!==null?parseInt(m.myPts):null;
+    const opP=m.oppPts!==null?parseInt(m.oppPts):null;
+    let outcome='',oc='var(--text3)',tp='';
+    if(myP!==null&&opP!==null){
+      if(myP>opP){outcome='Sieg';oc='var(--kf)';tp='2 Pkt';}
+      else if(myP===opP){outcome='Unentschieden';oc='var(--yellow)';tp='1 Pkt';}
+      else{outcome='Niederlage';oc='var(--red)';tp='0 Pkt';}
+    }
+    const myOpts='<option value="">–</option>'+myLists.map((c,i)=>`<option value="${i}"${m.myList===String(i)?' selected':''}>${c.name}</option>`).join('');
+    const oppOpts='<option value="">–</option>'+oppAvail.map(l=>`<option value="${l}"${m.oppList===l?' selected':''}>${l}</option>`).join('');
+    html+=`<div class="card">
+      <div style="font-size:11px;color:var(--text3);margin-bottom:10px;font-family:var(--mono)">Matchup ${mi+1}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+        <div><div class="label">Unsere Liste</div>
+          <select style="font-size:13px" onchange="G.rounds[${G.currentRound}].matchups[${mi}].myList=this.value;save()">${myOpts}</select>
+        </div>
+        <div><div class="label">Gegner-Liste</div>
+          <select style="font-size:13px" onchange="G.rounds[${G.currentRound}].matchups[${mi}].oppList=this.value;save()">${oppOpts}</select>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div><div class="label">Unsere Pkt</div>
+          <input type="number" min="0" max="20" value="${myP??''}" placeholder="0"
+            oninput="G.rounds[${G.currentRound}].matchups[${mi}].myPts=this.value===''?null:parseInt(this.value);save();renderResults()">
+        </div>
+        <div style="color:var(--text3);margin-top:14px">:</div>
+        <div><div class="label">Gegner Pkt</div>
+          <input type="number" min="0" max="20" value="${opP??''}" placeholder="0"
+            oninput="G.rounds[${G.currentRound}].matchups[${mi}].oppPts=this.value===''?null:parseInt(this.value);save();renderResults()">
+        </div>
+        <div style="margin-top:14px;flex:1;text-align:right">
+          <div style="font-size:13px;font-weight:600;color:${oc}">${outcome}</div>
+          <div style="font-size:11px;font-family:var(--mono);color:var(--text3)">${tp}</div>
+        </div>
+      </div>
+    </div>`;
+  });
+  let totMy=0,totOpp=0,totPts=0,hasAny=false;
+  r.matchups.forEach(m=>{
+    if(m.myPts!==null&&m.oppPts!==null){
+      hasAny=true;const mp=parseInt(m.myPts),op=parseInt(m.oppPts);
+      totMy+=mp;totOpp+=op;
+      if(mp>op)totPts+=2;else if(mp===op)totPts+=1;
+    }
+  });
+  if(hasAny)html+=`<div class="card" style="border-color:var(--border2)">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:13px;color:var(--text2)">Team-Punkte</span>
+      <span style="font-size:24px;font-weight:600;font-family:var(--mono);color:var(--accent)">${totPts}/8</span>
+    </div>
+    <div style="font-size:12px;color:var(--text3);margin-top:4px;font-family:var(--mono)">Szenario: ${totMy}:${totOpp}</div>
+  </div>`;
+  document.getElementById('results-content').innerHTML=html;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// AUSWERTUNG
+// ══════════════════════════════════════════════════════════════════
+function showAuswTab(id){
+  document.querySelectorAll('#panel-auswertung .view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('ausw-'+id).classList.add('active');
+  document.querySelectorAll('#panel-auswertung .stab').forEach((t,i)=>
+    t.classList.toggle('active',['uebersicht','matchups'][i]===id));
+  if(id==='uebersicht')renderAuswUebersicht();
+  if(id==='matchups')renderAuswMatchups();
+}
+
+function renderAuswertung(){
+  renderAuswUebersicht();
+}
+
+function renderAuswUebersicht(){
+  const wrap=document.getElementById('eval-uebersicht');
+  let totalPts=0;let html='';
+  G.rounds.forEach((r,ri)=>{
+    if(!r.matchups.some(m=>m.myPts!==null))return;
+    let rPts=0;let rMy=0;let rOpp=0;
+    r.matchups.forEach(m=>{
+      if(m.myPts===null)return;
+      const mp=parseInt(m.myPts),op=parseInt(m.oppPts);
+      rMy+=mp;rOpp+=op;
+      if(mp>op)rPts+=2;else if(mp===op)rPts+=1;
+    });
+    totalPts+=rPts;
+    const oc=rPts>=6?'var(--kf)':rPts>=4?'var(--yellow)':'var(--red)';
+    html+=`<div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="font-size:13px;font-weight:500">Runde ${ri+1}${r.oppName?' · '+r.oppName:''}</span>
+        <span style="font-size:20px;font-weight:600;font-family:var(--mono);color:${oc}">${rPts}/8</span>
+      </div>
+      <div style="font-size:12px;font-family:var(--mono);color:var(--text3)">${r.scenario||'–'} · ${rMy}:${rOpp}</div>
+    </div>`;
+  });
+  if(!html){wrap.innerHTML='<p class="hint">Noch keine Ergebnisse eingetragen.</p>';return;}
+  wrap.innerHTML=`<div class="card" style="border-color:var(--accent);background:#111a00;margin-bottom:12px">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:13px;font-weight:600">Gesamt</span>
+      <span style="font-size:28px;font-weight:600;font-family:var(--mono);color:var(--accent)">${totalPts} Pkt</span>
+    </div>
+  </div>`+html;
+}
+
+function renderAuswMatchups(){
+  const wrap=document.getElementById('eval-matchups');
+  let correct=0;let total=0;let html='';
+  const myLists=G.selectedCombo?G.selectedCombo.map(i=>G.candidates[i]).filter(Boolean):[];
+
+  G.rounds.forEach((r,ri)=>{
+    if(!r.matchups.some(m=>m.myPts!==null))return;
+    html+=`<div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin:16px 0 8px">Runde ${ri+1}${r.oppName?' · '+r.oppName:''}</div><div class="card">`;
+    r.matchups.forEach(m=>{
+      if(m.myPts===null||!m.myList)return;
+      const mp=parseInt(m.myPts),op=parseInt(m.oppPts);
+      const myListIdx=parseInt(m.myList);
+      const realLi=G.selectedCombo?G.selectedCombo[myListIdx]:-1;
+      const ei=G.enemies.indexOf(m.oppList);
+      let expR=null;
+      if(realLi>=0&&ei>=0){
+        const ci=getActiveSzenarien().indexOf(r.scenario||'');
+        if(ci>=0)expR=getR(realLi,ei,ci);
+      }
+      let out='',oc='var(--text3)';
+      if(mp>op){out='Sieg';oc='var(--kf)';}else if(mp===op){out='Unentschieden';oc='var(--yellow)';}else{out='Niederlage';oc='var(--red)';}
+      let match=null;
+      if(expR){
+        total++;
+        const expPts=getPts(expR);
+        const actW=mp>op,actD=mp===op,expW=expPts>1.0,expD=Math.abs(expPts-1.0)<0.1;
+        if((actW&&expW)||(actD&&expD)||(!actW&&!actD&&!expW&&!expD)){match=true;correct++;}else match=false;
+      }
+      const myName=myLists[myListIdx]?.name||'?';
+      html+=`<div class="eval-row">
+        <div>
+          <div style="font-size:13px">${myName} vs ${m.oppList||'?'}</div>
+          ${expR?`<div class="hint">Erwartet: <span class="chip chip-${expR}">${RATINGS.find(x=>x.val===expR)?.label}</span></div>`:'<div class="hint">Kein Matchup-Wert</div>'}
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-size:13px;font-weight:600;color:${oc}">${out}</div>
+          <div style="font-size:11px;font-family:var(--mono);color:var(--text3)">${mp}:${op}</div>
+          ${match!==null?`<div style="font-size:10px;color:${match?'var(--kf)':'var(--red)'}">${match?'✓ korrekt':'✗ falsch'}</div>`:''}
+        </div>
+      </div>`;
+    });
+    html+=`</div>`;
+  });
+
+  if(!html){wrap.innerHTML='<p class="hint">Noch keine Ergebnisse eingetragen.</p>';return;}
+  const summary=total>0?`<div class="card" style="margin-bottom:12px;border-color:var(--border2)">
+    <div style="font-size:13px;color:var(--text2)">Einschätzungen korrekt</div>
+    <div style="font-size:22px;font-weight:600;font-family:var(--mono);color:var(--accent);margin-top:4px">${correct}/${total} (${Math.round(correct/total*100)}%)</div>
+  </div>`:'';
+  wrap.innerHTML=summary+html;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════════════════
+load();
+renderPlayers();
+renderCandidates();
+renderEnemies();
+renderMatrixTabs();
+document.getElementById('round-badge-wrap').style.display='none';
+</script>
+
+</body>
+</html>
