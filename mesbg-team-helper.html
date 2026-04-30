@@ -86,7 +86,8 @@ select:focus{outline:none;border-color:#6ab820}
 .player-toggles{display:flex;flex-wrap:wrap;gap:6px}
 .ptoggle{padding:6px 12px;font-size:12px;border:1px solid #ccc;border-radius:20px;cursor:pointer;background:#f0efe8;color:#555}
 .ptoggle.on{background:#6ab820;color:#fff;border-color:#6ab820;font-weight:600}
-.rating-sel{padding:8px 10px;font-size:12px;font-family:var(–mono);background:#f5f4f0;border:1px solid #ccc;border-radius:6px;color:#1a1a1a;width:100%;appearance:none;-webkit-appearance:none}
+.rating-sel{padding:8px 10px;font-size:12px;font-family:var(–mono);background:#f5f4f0;border:1px solid #ccc;border-radius:6px;color:#1a1a1a;width:100%;appearance:none;-webkit-appearance:none;text-align:center;text-align-last:center}
+.rating-sel.r-empty{border-color:#ccc;color:#bbb;background:#fafaf8;border-style:dashed}
 .rating-sel.r-kf{border-color:#6ab820;color:#2a6000;background:#f0f8e0}
 .rating-sel.r-lf{border-color:#50a878;color:#0a5030;background:#e8f5ee}
 .rating-sel.r-50{border-color:#ccc;color:#555;background:#f5f4f0}
@@ -317,7 +318,7 @@ textarea.import-area{min-height:80px;font-size:13px;font-family:var(–mono)}
       <div id="attack-rec"></div>
       <div class="divider"></div>
       <div class="hint">
-        <strong style="color:var(--text2)">Checklist:</strong><br>
+        <strong style="color:#555">Checklist:</strong><br>
         · Hat der Gegner eine Liste die euren Angreifer klar schlägt?<br>
         · Welche Pool-Liste profitiert wenn der Angreifer ein bestimmtes Matchup zieht?<br>
         · Keine spezialisierte Konter-Liste als Angreifer exponieren.
@@ -540,25 +541,30 @@ function setMode(mode){
 // ══════════════════════════════════════════════════════════════════
 function mkey(li,ei,ci){return`${li}_${ei}_${ci}`;}
 function getPts(r){return RATINGS.find(x=>x.val===r)?.pts??1.0;}
-function getR(li,ei,ci){return G.matrix[mkey(li,ei,ci)]||'50';}
+function getR(li,ei,ci){return G.matrix[mkey(li,ei,ci)]||'';}
 function getVC(){return G.candidates.filter(c=>c.name.trim());}
 function getVE(){return G.enemies.filter(e=>e.trim());}
 function getAP(){return G.players.map((p,i)=>({p,i})).filter(x=>x.p.trim());}
 function R(){return G.rounds[G.currentRound];}
 
 function avgForCand(li,ci){
-  const ve=getVE();if(!ve.length)return 1.0;
-  return ve.reduce((s,e,idx)=>s+getPts(getR(li,G.enemies.indexOf(e),ci)),0)/ve.length;
+  const ve=getVE();if(!ve.length)return null;
+  const rated=ve.map(e=>getR(li,G.enemies.indexOf(e),ci)).filter(v=>v!=='');
+  if(!rated.length)return null;
+  return rated.reduce((s,v)=>s+getPts(v),0)/rated.length;
 }
 function avgForList(li,ci){
-  const ve=G.enemies.filter(e=>e.trim());if(!ve.length)return 1.0;
-  return ve.reduce((s,_,ei)=>s+getPts(getR(li,ei,ci)),0)/ve.length;
+  const ve=G.enemies.filter(e=>e.trim());if(!ve.length)return null;
+  const rated=ve.map((_,ei)=>getR(li,ei,ci)).filter(v=>v!=='');
+  if(!rated.length)return null;
+  return rated.reduce((s,v)=>s+getPts(v),0)/rated.length;
 }
 function chipCls(pts){if(pts>=1.6)return'kf';if(pts>=1.15)return'lf';if(pts>=0.85)return'50';if(pts>=0.4)return'lu';return'ku';}
 function chipLbl(c){return{kf:'++',lf:'+','50':'0',lu:'−',ku:'−−'}[c];}
 
 function rSel(id,val,onch){
-  return`<select class="rating-sel r-${val}" id="${id}" onchange="${onch};this.className='rating-sel r-'+this.value">
+  return`<select class="rating-sel r-${val||'empty'}" id="${id}" onchange="${onch};this.className='rating-sel r-'+this.value">
+    <option value="">· · ·</option>
     ${RATINGS.map(r=>`<option value="${r.val}"${val===r.val?' selected':''}>${r.label}</option>`).join('')}
   </select>`;
 }
@@ -591,7 +597,7 @@ function renderScenarios(){
         ${sc.map(s=>{
           const on=active.includes(s.name);
           return`<button onclick="toggleScenario('${s.name}')"
-            style="padding:6px 12px;font-size:12px;border:1px solid ${on?'var(--accent)':'var(--border)'};border-radius:20px;cursor:pointer;background:${on?'var(--accent)':'var(--bg3)'};color:${on?'#111':'var(--text2)'};font-weight:${on?'600':'400'}">
+            style="padding:6px 12px;font-size:12px;border:1px solid ${on?'#6ab820':'#ccc'};border-radius:20px;cursor:pointer;background:${on?'#6ab820':'#f0efe8'};color:${on?'#fff':'#555'};font-weight:${on?'600':'400'}">
             ${s.name}
           </button>`;
         }).join('')}
@@ -670,9 +676,9 @@ function renderMatrixContent(){
   html+='</tr></thead><tbody>';
   ve.forEach(e=>{
     const ei=G.enemies.indexOf(e);
-    html+=`<tr><td style="font-size:12px;padding:6px 4px;color:var(--text2);white-space:nowrap">${e}</td>`;
+    html+=`<tr><td style="font-size:12px;padding:6px 4px;color:#555;white-space:nowrap">${e}</td>`;
     sc.forEach((_,ci)=>{
-      const key=mkey(li,ei,ci);const val=G.matrix[key]||'50';
+      const key=mkey(li,ei,ci);const val=G.matrix[key]||'';
       html+=`<td>${rSel(`mx_${li}_${ei}_${ci}`,val,`G.matrix['${key}']=this.value;save()`)}</td>`;
     });
     html+='</tr>';
@@ -690,25 +696,29 @@ function scoreCombo(combo){
   const sc=getActiveSzenarien();
   const n=sc.length||1;
   const catAvgs=sc.map((_,ci)=>{
-    const avgs=combo.map(c=>avgForCand(G.candidates.indexOf(c),ci));
+    const avgs=combo.map(c=>avgForCand(G.candidates.indexOf(c),ci)).filter(v=>v!==null);
+    if(!avgs.length)return null;
     return avgs.reduce((a,b)=>a+b,0)/avgs.length;
-  });
-  const overall=catAvgs.length?catAvgs.reduce((a,b)=>a+b,0)/n:1.0;
-  const minC=catAvgs.length?Math.min(...catAvgs):1.0;
-  // reliability = fraction of list×scenario combos with value >= 1.0 (0 or better)
-  const totalCells=combo.length*n;
-  let reliableCells=0;
+  }).filter(v=>v!==null);
+  const overall=catAvgs.length?catAvgs.reduce((a,b)=>a+b,0)/catAvgs.length:null;
+  const minC=catAvgs.length?Math.min(...catAvgs):null;
+  // reliability = fraction of rated list×scenario combos with value >= 1.0
+  let totalCells=0,reliableCells=0;
   combo.forEach(c=>{
     const li=G.candidates.indexOf(c);
     sc.forEach((_,ci)=>{
       const ve=getVE();
-      const avgForCell=ve.length?ve.reduce((s,e,idx)=>s+getPts(getR(li,G.enemies.indexOf(e),ci)),0)/ve.length:1.0;
-      if(avgForCell>=1.0)reliableCells++;
+      const rated=ve.map((_,ei)=>getR(li,G.enemies.indexOf(ve[ei]),ci)).filter(v=>v!=='');
+      if(!rated.length)return;
+      totalCells++;
+      const avg=rated.reduce((s,v)=>s+getPts(v),0)/rated.length;
+      if(avg>=1.0)reliableCells++;
     });
   });
-  const reliability=totalCells>0?reliableCells/totalCells:1.0;
-  const score=reliability*0.6+overall*0.3+minC*0.1;
-  return{catAvgs,sc,overall,minC,reliability,score};
+  if(totalCells===0)return{sc,overall:null,minC:null,reliability:null,score:null};
+  const reliability=reliableCells/totalCells;
+  const score=reliability*0.6+(overall||1.0)*0.3+(minC||1.0)*0.1;
+  return{sc,overall,minC,reliability,score};
 }
 function hasAnyMatrixData(){
   return Object.keys(G.matrix).length>0;
@@ -726,7 +736,8 @@ function renderPortfolio(){
   });
   if(!valid.length){out.innerHTML='<div class="box-err">Keine gültige Kombi – Spieler-Zuordnungen prüfen.</div>';return;}
   const sm=document.getElementById('sort-mode').value;
-  let scored=valid.map(combo=>({combo,s:scoreCombo(combo)}));
+  let scored=valid.map(combo=>({combo,s:scoreCombo(combo)})).filter(({s})=>s.score!==null);
+  if(!scored.length){out.innerHTML='<div class="box-warn">Noch zu wenig Matchup-Daten für eine Bewertung.</div>';return;}
   if(sm==='portfolio')scored.sort((a,b)=>b.s.score-a.s.score);
   else if(sm==='avg')scored.sort((a,b)=>b.s.overall-a.s.overall);
   else scored.sort((a,b)=>b.s.reliability-a.s.reliability);
@@ -744,7 +755,7 @@ function renderPortfolio(){
       <div class="score-bar"><div class="score-fill" style="width:${pct}%"></div></div>
       <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px">${combo.map(c=>`<span class="tag">${c.name}</span>`).join('')}</div>
       <div style="font-size:11px;color:#888;margin-top:4px;font-family:var(--mono)">
-        Verlässlichkeit ${Math.round(s.reliability*100)}% · Ø${s.overall.toFixed(2)} · Schwächstes ${s.minC.toFixed(2)}
+        Verlässlichkeit ${s.reliability!==null?Math.round(s.reliability*100)+'%':'–'} · Ø${s.overall!==null?s.overall.toFixed(2):'–'} · Schwächstes ${s.minC!==null?s.minC.toFixed(2):'–'}
       </div>
       ${isPicked?'<div style="font-size:12px;color:#4a8c10;margin-top:8px;font-weight:600">✓ Gewählt</div>':''}
     </div>`;
@@ -949,16 +960,21 @@ function renderStrike(){
   updateOppStrikeOpts();
 
   const scores=myLists.map((c,li)=>({name:c.name,li,avg:avgForList(G.selectedCombo[li],ci)}));
-  const minAvg=Math.min(...scores.map(s=>s.avg));
+  const ratedScores=scores.filter(s=>s.avg!==null);
+  const minAvg=ratedScores.length?Math.min(...ratedScores.map(s=>s.avg)):null;
   document.getElementById('strike-rec').innerHTML=
-    [...scores].sort((a,b)=>a.avg-b.avg).map(s=>{
-      const cls=chipCls(s.avg);const isW=Math.abs(s.avg-minAvg)<0.001;
-      return`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+    [...scores].sort((a,b)=>(a.avg??99)-(b.avg??99)).map(s=>{
+      if(s.avg===null)return`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee">
+        <span style="font-size:13px">${s.name}</span>
+        <span style="font-size:11px;color:#ccc">nicht bewertet</span>
+      </div>`;
+      const cls=chipCls(s.avg);const isW=minAvg!==null&&Math.abs(s.avg-minAvg)<0.001;
+      return`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee">
         <span style="font-size:13px">${s.name}</span>
         <div style="display:flex;align-items:center;gap:6px">
           <span class="chip chip-${cls}">${chipLbl(cls)}</span>
-          <span style="font-size:11px;font-family:var(--mono);color:var(--text3)">${s.avg.toFixed(2)}</span>
-          ${isW?'<span style="font-size:10px;color:var(--yellow);border:1px solid var(--yellow);border-radius:4px;padding:1px 5px">streichen?</span>':''}
+          <span style="font-size:11px;font-family:var(--mono);color:#888">${s.avg.toFixed(2)}</span>
+          ${isW?'<span style="font-size:10px;color:#804000;border:1px solid #e0a040;border-radius:4px;padding:1px 5px">streichen?</span>':''}
         </div>
       </div>`;
     }).join('');
@@ -988,16 +1004,21 @@ function renderAttack(){
   const scores=myLists.map((c,i)=>({name:c.name,li:G.selectedCombo[i],localIdx:i,avg:avgForList(G.selectedCombo[i],ci)}))
     .filter(s=>s.localIdx!==myStruck);
   if(!scores.length){document.getElementById('attack-rec').innerHTML='<p class="hint">Erst streichen in 2a.</p>';return;}
-  const maxAvg=Math.max(...scores.map(s=>s.avg));
+  const ratedScores=scores.filter(s=>s.avg!==null);
+  const maxAvg=ratedScores.length?Math.max(...ratedScores.map(s=>s.avg)):null;
   document.getElementById('attack-rec').innerHTML=
-    [...scores].sort((a,b)=>b.avg-a.avg).map(s=>{
-      const cls=chipCls(s.avg);const isBest=Math.abs(s.avg-maxAvg)<0.001;
-      return`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
-        <span style="font-size:13px;${isBest?'font-weight:600;color:var(--accent)':''}">${s.name}</span>
+    [...scores].sort((a,b)=>(b.avg??-1)-(a.avg??-1)).map(s=>{
+      if(s.avg===null)return`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee">
+        <span style="font-size:13px">${s.name}</span>
+        <span style="font-size:11px;color:#ccc">nicht bewertet</span>
+      </div>`;
+      const cls=chipCls(s.avg);const isBest=maxAvg!==null&&Math.abs(s.avg-maxAvg)<0.001;
+      return`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee">
+        <span style="font-size:13px;${isBest?'font-weight:600;color:#4a8c10':''}">${s.name}</span>
         <div style="display:flex;align-items:center;gap:6px">
           <span class="chip chip-${cls}">${chipLbl(cls)}</span>
-          <span style="font-size:11px;font-family:var(--mono);color:var(--text3)">${s.avg.toFixed(2)}</span>
-          ${isBest?'<span style="font-size:10px;color:var(--accent);border:1px solid var(--accent);border-radius:4px;padding:1px 5px">angreifen?</span>':''}
+          <span style="font-size:11px;font-family:var(--mono);color:#888">${s.avg.toFixed(2)}</span>
+          ${isBest?'<span style="font-size:10px;color:#4a8c10;border:1px solid #6ab820;border-radius:4px;padding:1px 5px">angreifen?</span>':''}
         </div>
       </div>`;
     }).join('');
