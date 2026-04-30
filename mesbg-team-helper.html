@@ -233,18 +233,11 @@ textarea.import-area{min-height:80px;font-size:13px;font-family:var(–mono)}
   <div class="content phase" id="phase-4">
     <div class="card" style="display:flex;gap:10px;flex-wrap:wrap">
       <div style="flex:1;min-width:120px">
-        <div class="label">Min. Szenarien ≥ 50/50</div>
-        <select id="filter-cats" onchange="renderPortfolio()">
-          <option value="1">mind. 1</option><option value="2" selected>mind. 2</option>
-          <option value="3">mind. 3</option><option value="4">mind. 4</option>
-        </select>
-      </div>
-      <div style="flex:1;min-width:120px">
         <div class="label">Sortierung</div>
         <select id="sort-mode" onchange="renderPortfolio()">
           <option value="portfolio">Portfolio-Score</option>
           <option value="avg">Ø Note</option>
-          <option value="coverage">Abdeckung</option>
+          <option value="coverage">Verlässlichkeit</option>
         </select>
       </div>
     </div>
@@ -418,10 +411,10 @@ function getActiveSzenarien(){return(G.scenarios||[]).filter(n=>ALL_SCENARIOS.fi
 function CATS_arr(){return getActiveSzenarien();}
 function CATS_S_arr(){return getActiveSzenarien().map(n=>n.length>12?n.slice(0,10)+'…':n);}
 const RATINGS=[
-  {val:'kf',label:'++',pts:1.8},
-  {val:'lf',label:'+',pts:1.35},
+  {val:'kf',label:'++',pts:1.4},
+  {val:'lf',label:'+',pts:1.2},
   {val:'50',label:'0',pts:1.0},
-  {val:'lu',label:'−',pts:0.65},
+  {val:'lu',label:'−',pts:0.7},
   {val:'ku',label:'−−',pts:0.2}
 ];
 const SK='mesbg_v1';
@@ -701,52 +694,82 @@ function scoreCombo(combo){
     return avgs.reduce((a,b)=>a+b,0)/avgs.length;
   });
   const overall=catAvgs.length?catAvgs.reduce((a,b)=>a+b,0)/n:1.0;
-  const above=catAvgs.filter(a=>a>=1.0).length;
   const minC=catAvgs.length?Math.min(...catAvgs):1.0;
-  return{catAvgs,sc,overall,above,minC,score:overall*0.5+minC*0.3+(n?above/n:0)*0.2*1.8};
+  // reliability = fraction of list×scenario combos with value >= 1.0 (0 or better)
+  const totalCells=combo.length*n;
+  let reliableCells=0;
+  combo.forEach(c=>{
+    const li=G.candidates.indexOf(c);
+    sc.forEach((_,ci)=>{
+      const ve=getVE();
+      const avgForCell=ve.length?ve.reduce((s,e,idx)=>s+getPts(getR(li,G.enemies.indexOf(e),ci)),0)/ve.length:1.0;
+      if(avgForCell>=1.0)reliableCells++;
+    });
+  });
+  const reliability=totalCells>0?reliableCells/totalCells:1.0;
+  const score=reliability*0.6+overall*0.3+minC*0.1;
+  return{catAvgs,sc,overall,minC,reliability,score};
+}
+function hasAnyMatrixData(){
+  return Object.keys(G.matrix).length>0;
 }
 function renderPortfolio(){
   const out=document.getElementById('portfolio-output');
   const vc=getVC();const ap=getAP();const sc=getActiveSzenarien();
   if(vc.length<5){out.innerHTML='<div class="box-warn">Mind. 5 Listen in Phase 2.</div>';return;}
   if(!sc.length){out.innerHTML='<div class="box-warn">Erst Szenarien in Phase 3 wählen.</div>';return;}
+  if(!hasAnyMatrixData()){out.innerHTML='<div class="box-warn">Erst Matchup-Matrix in Phase 4 befüllen.</div>';return;}
   const allC=getCombinations(vc,5);
   const valid=allC.filter(combo=>{
     const cov=new Set(combo.flatMap(c=>c.players));
     return ap.every(({i})=>cov.has(i));
   });
   if(!valid.length){out.innerHTML='<div class="box-err">Keine gültige Kombi – Spieler-Zuordnungen prüfen.</div>';return;}
-  const minC=parseInt(document.getElementById('filter-cats').value);
   const sm=document.getElementById('sort-mode').value;
-  let scored=valid.map(combo=>({combo,s:scoreCombo(combo)})).filter(({s})=>s.above>=minC);
-  if(!scored.length){out.innerHTML='<div class="box-warn">Kein Ergebnis – Filter lockern?</div>';return;}
+  let scored=valid.map(combo=>({combo,s:scoreCombo(combo)}));
   if(sm==='portfolio')scored.sort((a,b)=>b.s.score-a.s.score);
   else if(sm==='avg')scored.sort((a,b)=>b.s.overall-a.s.overall);
-  else scored.sort((a,b)=>b.s.above-a.s.above);
+  else scored.sort((a,b)=>b.s.reliability-a.s.reliability);
   const topN=Math.min(10,scored.length);const best=scored[0].s.score;
   let html=`<p class="hint" style="margin:10px 0">${scored.length} gültige Kombis · Top ${topN}</p>`;
   scored.slice(0,topN).forEach(({combo,s},rank)=>{
     const idxArr=combo.map(c=>G.candidates.indexOf(c));
     const isPicked=G.selectedCombo&&idxArr.every((x,i)=>G.selectedCombo[i]===x);
     const pct=Math.round(s.score/best*100);
-    // show top 4 scenarios by spread for coverage grid
-    const showSc=s.sc.slice(0,Math.min(4,s.sc.length));
     html+=`<div class="combo-card${isPicked?' picked':''}" onclick="pickCombo(${JSON.stringify(idxArr)})">
       <div style="display:flex;justify-content:space-between;align-items:baseline">
-        <span style="font-size:12px;color:var(--text3);font-family:var(--mono)">#${rank+1}</span>
+        <span style="font-size:12px;color:#888;font-family:var(--mono)">#${rank+1}</span>
         <span class="combo-score-num">${s.score.toFixed(2)}</span>
       </div>
       <div class="score-bar"><div class="score-fill" style="width:${pct}%"></div></div>
       <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px">${combo.map(c=>`<span class="tag">${c.name}</span>`).join('')}</div>
-      <div class="cov-grid" style="grid-template-columns:repeat(${Math.min(4,showSc.length)},1fr)">${showSc.map((name,ci)=>{
-        const avg=s.catAvgs[ci];const cls=avg>=1.35?'cov-good':avg>=0.85?'cov-mid':'cov-bad';
-        const short=name.length>10?name.slice(0,9)+'…':name;
-        return`<div class="cov-cell ${cls}">${short}<br><strong>${avg.toFixed(2)}</strong></div>`;
-      }).join('')}</div>
-      <div style="font-size:11px;color:var(--text3);margin-top:6px;font-family:var(--mono)">Ø${s.overall.toFixed(2)} · min${s.minC.toFixed(2)} · ${s.above}/${s.sc.length}≥50/50</div>
-      ${isPicked?'<div style="font-size:12px;color:var(--accent);margin-top:8px;font-weight:600">✓ Gewählt</div>':''}
+      <div style="font-size:11px;color:#888;margin-top:4px;font-family:var(--mono)">
+        Verlässlichkeit ${Math.round(s.reliability*100)}% · Ø${s.overall.toFixed(2)} · Schwächstes ${s.minC.toFixed(2)}
+      </div>
+      ${isPicked?'<div style="font-size:12px;color:#4a8c10;margin-top:8px;font-weight:600">✓ Gewählt</div>':''}
     </div>`;
   });
+  // Legend
+  html+=`<div class="card" style="margin-top:16px">
+    <div class="card-title">Legende · Score-Berechnung</div>
+    <div style="font-size:12px;color:#555;line-height:1.8;margin-bottom:12px">
+      Der Score bewertet wie <strong>verlässlich</strong> eine Kombi über alle Szenarien funktioniert – nicht wie stark sie in einzelnen glänzt.
+    </div>
+    <div style="display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:12px;margin-bottom:12px">
+      <span style="font-weight:600;color:#555">60%</span><span style="color:#555">Verlässlichkeit – Anteil Szenarien mit 0 oder besser</span>
+      <span style="font-weight:600;color:#555">30%</span><span style="color:#555">Gesamtdurchschnitt aller Listen × Szenarien</span>
+      <span style="font-weight:600;color:#555">10%</span><span style="color:#555">Schwächstes Szenario (Malus für −− Häufungen)</span>
+    </div>
+    <div class="divider"></div>
+    <div class="label" style="margin-bottom:8px">Bewertungsskala</div>
+    <div style="display:flex;flex-direction:column;gap:6px;font-size:12px">
+      <div style="display:flex;align-items:center;gap:10px"><span class="chip chip-kf">++</span><span style="color:#555">Cool, aber nicht nötig – kleiner Bonus</span></div>
+      <div style="display:flex;align-items:center;gap:10px"><span class="chip chip-lf">+</span><span style="color:#555">Ziel – klar positiv</span></div>
+      <div style="display:flex;align-items:center;gap:10px"><span class="chip chip-50">0</span><span style="color:#555">Akzeptabel – neutral</span></div>
+      <div style="display:flex;align-items:center;gap:10px"><span class="chip chip-lu">−</span><span style="color:#555">Tolerierbar – leichter Malus</span></div>
+      <div style="display:flex;align-items:center;gap:10px"><span class="chip chip-ku">−−</span><span style="color:#555">Unerwünscht – sollte vermieden werden</span></div>
+    </div>
+  </div>`;
   out.innerHTML=html;
 }
 function pickCombo(idxArr){G.selectedCombo=idxArr;save();renderPortfolio();}
