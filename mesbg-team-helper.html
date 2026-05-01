@@ -625,6 +625,20 @@ function renderPlayers(){
 }
 
 // Candidates
+function removeCandidate(i){
+  const newMatrix={};
+  Object.keys(G.matrix).forEach(key=>{
+    const parts=key.split('_');
+    const li=parseInt(parts[0]),ei=parseInt(parts[1]),ci=parseInt(parts[2]);
+    if(li===i)return;
+    if(li>i){newMatrix[mkey(li-1,ei,ci)]=G.matrix[key];}
+    else{newMatrix[key]=G.matrix[key];}
+  });
+  G.matrix=newMatrix;
+  G.candidates.splice(i,1);
+  if(G.selectedCombo)G.selectedCombo=null; // invalidate combo
+  save();renderCandidates();renderMatrixTabs();
+}
 function addCandidate(){G.candidates.push({name:'',players:[]});save();renderCandidates();}
 function renderCandidates(){
   const ap=getAP();
@@ -633,7 +647,7 @@ function renderCandidates(){
       <div style="display:flex;gap:8px;margin-bottom:10px">
         <input type="text" value="${c.name}" placeholder="Listenname..." style="flex:1"
           oninput="G.candidates[${i}].name=this.value;save();renderMatrixTabs()">
-        <button class="btn btn-sm btn-danger" onclick="G.candidates.splice(${i},1);save();renderCandidates();renderMatrixTabs()">×</button>
+        <button class="btn btn-sm btn-danger" onclick="removeCandidate(${i})">×</button>
       </div>
       <div class="label" style="margin-bottom:6px">Spieler</div>
       <div class="player-toggles">
@@ -648,13 +662,26 @@ function toggleCP(ci,pi){
 }
 
 // Enemies + Matrix
+function removeEnemy(i){
+  const newMatrix={};
+  Object.keys(G.matrix).forEach(key=>{
+    const parts=key.split('_');
+    const li=parseInt(parts[0]),ei=parseInt(parts[1]),ci=parseInt(parts[2]);
+    if(ei===i)return;
+    if(ei>i){newMatrix[mkey(li,ei-1,ci)]=G.matrix[key];}
+    else{newMatrix[key]=G.matrix[key];}
+  });
+  G.matrix=newMatrix;
+  G.enemies.splice(i,1);
+  save();renderEnemies();renderMatrixContent();
+}
 function addEnemy(){G.enemies.push('');save();renderEnemies();renderMatrixTabs();}
 function renderEnemies(){
   document.getElementById('enemy-inputs').innerHTML=G.enemies.map((e,i)=>`
     <div class="row">
       <input type="text" value="${e}" placeholder="z.B. Mordor Ringwraiths..."
         oninput="G.enemies[${i}]=this.value;save();renderMatrixContent()">
-      <button class="btn btn-sm btn-danger" onclick="G.enemies.splice(${i},1);save();renderEnemies();renderMatrixContent()">×</button>
+      <button class="btn btn-sm btn-danger" onclick="removeEnemy(${i})">×</button>
     </div>`).join('');
 }
 function renderMatrixTabs(){
