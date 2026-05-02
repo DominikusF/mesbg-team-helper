@@ -764,8 +764,8 @@ function buildHeatmap(idxArr){
   const sc=getActiveSzenarien();
   const ve=getVE();
   if(!ve.length||!sc.length)return'<p class="hint">Keine Daten.</p>';
+  const uid='hm_'+idxArr.join('_');
 
-  // avg per enemy × scenario across all 5 lists
   const cellAvg=(ei,ci)=>{
     const vals=combo.map(c=>{
       const li=G.candidates.indexOf(c);
@@ -776,50 +776,73 @@ function buildHeatmap(idxArr){
   };
 
   const cellColor=(avg)=>{
-    if(avg===null)return'#f5f4f0';
-    if(avg>=1.3)return'#c8f090';
-    if(avg>=1.05)return'#e8f5d0';
-    if(avg>=0.9)return'#f5f4f0';
-    if(avg>=0.6)return'#ffe0b0';
-    return'#ffbdbd';
+    if(avg===null)return'#eeede8';
+    if(avg>=1.3)return'#7ecb6a';
+    if(avg>=1.05)return'#b8e890';
+    if(avg>=0.9)return'#e8e6e0';
+    if(avg>=0.6)return'#f0c060';
+    return'#e05050';
   };
 
-  // build table
-  let html='<div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:11px;width:100%"><thead><tr><th style="text-align:left;padding:4px 6px;color:#888;font-weight:500;white-space:nowrap">Gegner</th>';
-  sc.forEach(s=>html+=`<th style="padding:4px 4px;color:#888;font-weight:500;white-space:nowrap;text-align:center;min-width:52px">${s.length>8?s.slice(0,7)+'…':s}</th>`);
-  html+='</tr></thead><tbody>';
+  const ratingLabel=(avg)=>{
+    if(avg===null)return'nicht bewertet';
+    if(avg>=1.3)return'++';
+    if(avg>=1.05)return'+';
+    if(avg>=0.9)return'0';
+    if(avg>=0.6)return'−';
+    return'−−';
+  };
 
-  const warnings=[];
+  // Build compact grid – no text in cells
+  let html=`<div style="overflow-x:auto;margin-bottom:8px">
+    <table style="border-collapse:separate;border-spacing:2px">
+      <tbody>`;
+
   ve.forEach((e,ei)=>{
-    const rowAvgs=sc.map((_,ci)=>cellAvg(ei,ci));
-    const weakInRow=rowAvgs.filter(a=>a!==null&&a<0.85).length;
-    if(weakInRow>=3)warnings.push(`${e}: schwach in ${weakInRow} Szenarien`);
-    html+=`<tr><td style="padding:4px 6px;white-space:nowrap;font-weight:500;color:#333">${e}</td>`;
-    rowAvgs.forEach((avg,ci)=>{
-      const colWeakCount=ve.filter((_,ei2)=>{const a=cellAvg(ei2,ci);return a!==null&&a<0.85;}).length;
-      const border=colWeakCount>=Math.ceil(ve.length*0.6)?'2px solid #e08080':'1px solid #eee';
-      const label=avg===null?'·':avg>=1.3?'++':avg>=1.05?'+':avg>=0.9?'0':avg>=0.6?'−':'−−';
-      const textColor=avg===null?'#ccc':avg>=1.05?'#2a6000':avg>=0.9?'#555':avg>=0.6?'#804000':'#800000';
-      html+=`<td style="padding:4px;text-align:center;background:${cellColor(avg)};border:${border};font-family:var(--mono);font-weight:600;color:${textColor}">${label}</td>`;
+    html+=`<tr>`;
+    sc.forEach((_,ci)=>{
+      const avg=cellAvg(ei,ci);
+      const col=cellColor(avg);
+      const label=ratingLabel(avg);
+      html+=`<td onclick="event.stopPropagation();showHmInfo('${uid}','${sc[ci].replace(/'/g,"\\'")}','${e.replace(/'/g,"\\'")}','${label}')"
+        style="width:18px;height:18px;min-width:18px;background:${col};border-radius:3px;cursor:pointer"></td>`;
     });
-    html+='</tr>';
+    html+=`</tr>`;
   });
 
-  // column warnings
-  sc.forEach((_,ci)=>{
-    const weakCount=ve.filter((_,ei)=>{const a=cellAvg(ei,ci);return a!==null&&a<0.85;}).length;
-    if(weakCount>=Math.ceil(ve.length*0.6))warnings.push(`${sc[ci]}: schwaches Szenario (${weakCount}/${ve.length} Gegner)`);
-  });
+  html+=`</tbody></table></div>
+  <div id="${uid}-info" style="font-size:12px;color:#555;padding:6px 8px;background:#f5f4f0;border-radius:4px;min-height:28px;margin-bottom:8px"></div>`;
 
-  html+='</tbody></table></div>';
+  // Warnings
+  const warnings=[];
+  sc.forEach((scName,ci)=>{
+    const avgs=ve.map((_,ei)=>cellAvg(ei,ci)).filter(a=>a!==null);
+    if(!avgs.length)return;
+    const weakCount=avgs.filter(a=>a<0.85).length;
+    if(weakCount>=Math.ceil(avgs.length*0.2))
+      warnings.push(`${scName}: in ${weakCount} von ${avgs.length} Matchups schwach`);
+  });
+  ve.forEach((e,ei)=>{
+    const avgs=sc.map((_,ci)=>cellAvg(ei,ci)).filter(a=>a!==null);
+    if(!avgs.length)return;
+    const weakCount=avgs.filter(a=>a<0.85).length;
+    if(weakCount>=Math.ceil(avgs.length*0.2))
+      warnings.push(`vs. ${e}: in ${weakCount} von ${avgs.length} Szenarien schwach`);
+  });
 
   if(warnings.length){
-    html+=`<div style="margin-top:10px">${[...new Set(warnings)].map(w=>`<div style="font-size:12px;color:#804000;background:#fff8e8;border:1px solid #e0c040;border-radius:4px;padding:6px 10px;margin-bottom:4px">⚠ ${w}</div>`).join('')}</div>`;
+    html+=warnings.map(w=>`<div style="font-size:12px;color:#804000;background:#fff8e8;border:1px solid #e0c040;border-radius:4px;padding:6px 10px;margin-bottom:4px">⚠ ${w}</div>`).join('');
   } else {
-    html+=`<div style="font-size:12px;color:#2a6000;background:#e8f5d8;border:1px solid #90c040;border-radius:4px;padding:6px 10px;margin-top:10px">✓ Keine kritischen Schwachstellen</div>`;
+    html+=`<div style="font-size:12px;color:#2a6000;background:#e8f5d8;border:1px solid #90c040;border-radius:4px;padding:6px 10px">✓ Keine kritischen Schwachstellen</div>`;
   }
   return html;
 }
+
+function showHmInfo(uid,scenario,enemy,label){
+  const el=document.getElementById(uid+'-info');
+  if(el)el.textContent=`${scenario}  ·  ${enemy}`;
+}
+
 
 function hasAnyMatrixData(){
   return Object.keys(G.matrix).length>0;
@@ -849,19 +872,22 @@ function renderPortfolio(){
     const isPicked=G.selectedCombo&&idxArr.every((x,i)=>G.selectedCombo[i]===x);
     const pct=Math.round(s.score/best*100);
     const comboId=`combo-${rank}`;
-    html+=`<div class="combo-card${isPicked?' picked':''}">
-      <div style="display:flex;justify-content:space-between;align-items:center">
+    html+=`<div class="combo-card${isPicked?' picked':''}" onclick="pickCombo(${JSON.stringify(idxArr)})" style="cursor:pointer">
+      <div style="display:flex;justify-content:space-between;align-items:baseline">
         <span style="font-size:12px;color:#888;font-family:var(--mono)">#${rank+1}</span>
-        <button class="btn btn-sm${isPicked?' btn-primary':''}" onclick="pickCombo(${JSON.stringify(idxArr)})" style="font-size:12px;padding:5px 12px">${isPicked?'✓ Gewählt':'Wählen'}</button>
+        <span class="combo-score-num">${s.score.toFixed(2)}</span>
       </div>
       <div class="score-bar" style="margin:8px 0"><div class="score-fill" style="width:${pct}%"></div></div>
-      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">${combo.map(c=>`<span class="tag">${c.name}</span>`).join('')}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
+        ${combo.map(c=>`<span style="font-size:14px;font-weight:600;color:#1a1a1a;background:#eef7e0;border:1px solid #90c040;border-radius:6px;padding:4px 10px">${c.name}</span>`).join('')}
+      </div>
       <div style="font-size:11px;color:#888;font-family:var(--mono)">
         Verlässlichkeit ${s.reliability!==null?Math.round(s.reliability*100)+'%':'–'} · Ø${s.overall!==null?s.overall.toFixed(2):'–'} · Schwächstes ${s.minC!==null?s.minC.toFixed(2):'–'}
       </div>
+      ${isPicked?'<div style="font-size:12px;color:#4a8c10;margin-top:8px;font-weight:600">✓ Gewählt</div>':''}
       <div id="heatmap-${comboId}" style="display:none;margin-top:12px"></div>
       <div style="text-align:center;margin-top:10px">
-        <button onclick="toggleHeatmap('${comboId}',${JSON.stringify(idxArr)})" style="background:none;border:none;cursor:pointer;font-size:18px;color:#888;transition:transform .2s" id="arr-${comboId}">▾</button>
+        <button onclick="event.stopPropagation();toggleHeatmap('${comboId}',${JSON.stringify(idxArr)})" style="background:none;border:none;cursor:pointer;font-size:18px;color:#888;transition:transform .2s;padding:4px 16px" id="arr-${comboId}">▾</button>
       </div>
     </div>`;
   });
