@@ -538,7 +538,16 @@ function setMode(mode){
     el.classList.toggle('cur',['setup','turnier','auswertung'][i]===mode);
   });
   document.getElementById('round-badge-wrap').style.display=mode==='turnier'?'block':'none';
-  if(mode==='turnier'){updateRoundBadge();renderTeamSelect();renderMyListSelects();renderStrike();renderAttack();}
+  if(mode==='turnier'){
+    updateRoundBadge();
+    renderTeamSelect();
+    renderMyListSelects();
+    const r=R();
+    const sc=getActiveSzenarien();
+    const catEl=document.getElementById('round-cat');
+    if(catEl)catEl.innerHTML='<option value="">– wählen –</option>'+sc.map(s=>`<option value="${s}"${r.scenario===s?' selected':''}>${s}</option>`).join('');
+    renderStrike();renderAttack();
+  }
   if(mode==='auswertung')renderAuswertung();
   window.scrollTo(0,0);
 }
@@ -1026,7 +1035,6 @@ function renderTTMx(ti){
       const ei=G.enemies.indexOf(tl);const known=ei>=0;
       html+=`<tr><td style="font-size:10px;color:#555;padding:4px;line-height:1.3">
         <span style="color:#1a1a1a">${myC.name}</span><br>vs ${tl}
-        ${known?'<span class="chip chip-lf" style="font-size:9px;padding:1px 4px">bekannt</span>':''}
       </td>`;
       sc.forEach((_,ci)=>{
         const isExtra=G.extraLists&&G.extraLists.includes(tl);
