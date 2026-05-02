@@ -301,16 +301,17 @@ textarea.import-area{min-height:80px;font-size:13px;font-family:var(–mono)}
       <div id="opp-lists-input"></div>
       <div class="divider"></div>
       <div class="label" style="margin-bottom:6px">Gegner streicht</div>
-      <select id="opp-strike-sel" onchange="R().oppStruck=this.value;save()">
+      <select id="opp-strike-sel" onchange="R().oppStruck=this.value;save();renderStrikeHeatmap()">
         <option value="">– wählen –</option>
       </select>
     </div>
     <div class="card">
       <div class="card-title">Wir streichen – Empfehlung</div>
       <div id="strike-rec"></div>
+      <div id="strike-heatmap"></div>
       <div class="divider"></div>
       <div class="label" style="margin-bottom:6px">Wir streichen</div>
-      <select id="my-strike-sel" onchange="R().myStruck=this.value;save();renderAttack()">
+      <select id="my-strike-sel" onchange="R().myStruck=this.value;save();renderStrikeHeatmap();renderAttack()">
         <option value="">– wählen –</option>
       </select>
     </div>
@@ -1248,6 +1249,78 @@ function confirmAddOppExtraList(){
   save();renderStrike();renderExtraMatrix();
 }
 
+function renderStrikeHeatmap(){
+  const r=R();
+  const sc=getActiveSzenarien();
+  const ci=sc.indexOf(r.scenario||'');
+  const myLists=G.selectedCombo?G.selectedCombo.map(i=>G.candidates[i]).filter(Boolean):[];
+  const oppLists=getOppLists().filter(l=>l.trim());
+  const wrap=document.getElementById('strike-heatmap');
+  if(!wrap)return;
+  if(!myLists.length||!oppLists.length||ci<0){wrap.innerHTML='<p class="hint" style="margin-top:10px">Erst Szenario und Gegner-Listen eintragen.</p>';return;}
+
+  const myStruck=r.myStruck!==''?parseInt(r.myStruck):-1;
+  const oppStruck=r.oppStruck||'';
+
+  const hasMyStruck=myStruck>=0;
+  const hasOppStruck=oppStruck!=='';
+
+  const fadedMyIdx=hasMyStruck?myStruck:-1;
+  const fadedOppName=hasOppStruck?oppStruck:'';
+
+  // Color helpers
+  const cellColor=(val,faded)=>{
+    const colors={kf:'#7ecb6a',lf:'#b8e890','50':'#e8e6e0',lu:'#f0c060',ku:'#e05050','':`#eeede8`};
+    const fadedColors={kf:'#d4f0c8',lf:'#e4f5d0','50':'#f5f4f0',lu:'#f8e8b8',ku:'#f5c0c0','':`#f5f4f0`};
+    return faded?(fadedColors[val]||'#f5f4f0'):(colors[val]||'#eeede8');
+  };
+
+  const uid='shm_'+G.currentRound;
+  let html=`<div style="margin-top:14px">
+    <div style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px">Matchup-Übersicht · ${r.scenario||'kein Szenario'}</div>
+    <div style="overflow-x:auto">
+    <table style="border-collapse:separate;border-spacing:3px">
+      <thead><tr><th style="width:80px"></th>`;
+
+  oppLists.forEach(opp=>{
+    const faded=opp===fadedOppName;
+    html+=`<th style="font-size:10px;color:${faded?'#bbb':'#555'};font-weight:${faded?'400':'600'};padding:0 2px 4px;text-align:center;max-width:60px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${opp}">${opp.length>8?opp.slice(0,7)+'…':opp}</th>`;
+  });
+  html+=`</tr></thead><tbody>`;
+
+  myLists.forEach((c,i)=>{
+    const fadedRow=i===fadedMyIdx;
+    const realLi=G.selectedCombo[i];
+    html+=`<tr><td style="font-size:10px;color:${fadedRow?'#bbb':'#555'};font-weight:${fadedRow?'400':'600'};padding:2px 4px 2px 0;white-space:nowrap">${c.name.length>10?c.name.slice(0,9)+'…':c.name}</td>`;
+    oppLists.forEach(opp=>{
+      const fadedCol=opp===fadedOppName;
+      const faded=fadedRow||fadedCol;
+      const ei=G.enemies.indexOf(opp);
+      const xi=(G.extraLists||[]).indexOf(opp);
+      let val='';
+      if(ei>=0)val=getR(realLi,ei,ci)||'';
+      else if(xi>=0)val=(G.extraMatrix||{})[`${realLi}_${xi}_${ci}`]||'';
+      const col=cellColor(val,faded);
+      const label=val?RATINGS.find(x=>x.val===val)?.label||'·':'·';
+      html+=`<td onclick="showStrikeHmInfo('${uid}','${c.name.replace(/'/g,"\\'")}','${opp.replace(/'/g,"\\'")}','${label}')"
+        style="width:22px;height:22px;min-width:22px;background:${col};border-radius:3px;cursor:pointer;opacity:${faded?0.6:1}"></td>`;
+    });
+    html+=`</tr>`;
+  });
+
+  html+=`</tbody></table></div>
+  <div id="${uid}-info" style="font-size:12px;color:#555;padding:6px 8px;background:#f5f4f0;border-radius:4px;min-height:26px;margin-top:6px"></div>
+  <div style="font-size:11px;color:#aaa;margin-top:4px">${hasMyStruck||hasOppStruck?'Gestrichene Listen abgeblendet':''}</div>
+  </div>`;
+
+  wrap.innerHTML=html;
+}
+
+function showStrikeHmInfo(uid,myList,oppList,label){
+  const el=document.getElementById(uid+'-info');
+  if(el)el.textContent=`${myList}  vs  ${oppList}  ·  ${label}`;
+}
+
 // Strike
 function renderStrike(){
   if(!G.selectedCombo)return;
@@ -1264,7 +1337,6 @@ function renderStrike(){
     (G.extraLists||[]).filter(e=>e.trim()).map(e=>`<option value="${e}"${sel===e?' selected':''}>${e}</option>`).join('');
 
   if(hasTeam){
-    // Show team lists as dropdowns that update G.tourneyTeams directly
     const team=G.tourneyTeams[r.teamIdx];
     document.getElementById('opp-lists-input').innerHTML=
       team.lists.map((l,i)=>`
@@ -1278,11 +1350,10 @@ function renderStrike(){
         <button class="btn btn-sm btn-primary" onclick="confirmAddOppExtraList()">+</button>
       </div>`;
   } else {
-    // Manual entry – save to r.oppLists
     document.getElementById('opp-lists-input').innerHTML=
       (r.oppLists||['','','','','']).map((l,i)=>`
         <div class="row">
-          <select onchange="G.rounds[${G.currentRound}].oppLists[${i}]=this.value;save();updateOppStrikeOpts();renderDecisionSelects()">
+          <select onchange="G.rounds[${G.currentRound}].oppLists[${i}]=this.value;save();updateOppStrikeOpts();renderDecisionSelects();renderStrikeHeatmap()">
             ${oppListOpts(l)}
           </select>
         </div>`).join('')+
@@ -1319,6 +1390,7 @@ function renderStrike(){
     mySel.innerHTML='<option value="">– wählen –</option>'+
       myLists.map((c,i)=>`<option value="${i}"${myStruck===i?' selected':''}>${c.name}</option>`).join('');
   }
+  renderStrikeHeatmap();
   renderAttack();
 }
 function updateOppStrikeOpts(){
