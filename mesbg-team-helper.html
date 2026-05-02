@@ -440,7 +440,7 @@ let G={
   // Turnier
   currentRound:0,
   rounds:Array(5).fill(null).map(()=>({
-    scenario:'',oppName:'',oppLists:['','','','',''],oppStruck:'',myStruck:'',
+    scenario:'',oppName:'',oppLists:['','','','',''],teamIdx:-1,oppStruck:'',myStruck:'',
     attacker:'',pool:'',defA:'',defB:'',mRatings:{},
     matchups:Array(4).fill(null).map(()=>({myList:'',oppList:'',myPts:null,oppPts:null}))
   }))
@@ -1062,12 +1062,20 @@ function renderTTMx(ti){
   html+='</tbody></table></div>';wrap.innerHTML=html;
 }
 function updTTR(ti,ml,el,ci,val){
+  // check if el is a meta enemy
+  const ei=G.enemies.indexOf(el);
+  if(ei>=0){G.matrix[mkey(G.candidates.findIndex(c=>c.name===ml),ei,ci)]=val;save();return;}
+  // check if extra list
+  const xi=(G.extraLists||[]).indexOf(el);
+  const li=G.candidates.findIndex(c=>c.name===ml);
+  if(xi>=0&&li>=0){if(!G.extraMatrix)G.extraMatrix={};G.extraMatrix[`${li}_${xi}_${ci}`]=val;save();return;}
+  // fallback to team ratings
   if(!G.tourneyTeams[ti].ratings)G.tourneyTeams[ti].ratings={};
   if(!G.tourneyTeams[ti].ratings[ml])G.tourneyTeams[ti].ratings[ml]={};
   const sc=getActiveSzenarien();
   if(!G.tourneyTeams[ti].ratings[ml][el])G.tourneyTeams[ti].ratings[ml][el]=Array(sc.length).fill('');
   G.tourneyTeams[ti].ratings[ml][el][ci]=val;
-  save(); // just save, don't re-render
+  save();
 }
 function updExtraMatrix(li,xi,ci,val){
   if(!G.extraMatrix)G.extraMatrix={};
@@ -1186,15 +1194,25 @@ function setRound(i){
 
 function renderTeamSelect(){
   const sel=document.getElementById('team-select');if(!sel)return;
+  const r=R();
   sel.innerHTML='<option value="">– manuell –</option>'+
-    G.tourneyTeams.filter(t=>t.name.trim()).map((t,i)=>`<option value="${i}">${t.name}</option>`).join('');
+    G.tourneyTeams.filter(t=>t.name.trim()).map((t,i)=>`<option value="${i}"${r.teamIdx===i?' selected':''}>${t.name}</option>`).join('');
 }
+function getOppLists(){
+  const r=R();
+  if(r.teamIdx>=0&&G.tourneyTeams[r.teamIdx]){
+    return G.tourneyTeams[r.teamIdx].lists.map(l=>getTTName(l)).filter(l=>l.trim()).concat(['','','','','']).slice(0,5);
+  }
+  return r.oppLists||['','','','',''];
+}
+
 function selectTeam(val){
   if(val==='')return;
-  const team=G.tourneyTeams[parseInt(val)];if(!team)return;
+  const ti=parseInt(val);
+  const team=G.tourneyTeams[ti];if(!team)return;
   const r=R();
+  r.teamIdx=ti;
   r.oppName=team.name;
-  r.oppLists=team.lists.map(l=>getTTName(l)).concat(['','','','','']).slice(0,5);
   document.getElementById('opp-name').value=team.name;
   save();renderStrike();
 }
@@ -1212,6 +1230,16 @@ function renderMyListSelects(){
   if(msSel)msSel.innerHTML='<option value="">– wählen –</option>'+myLists.map((c,i)=>`<option value="${i}">${c.name}</option>`).join('');
 }
 
+function confirmAddOppExtraList(){
+  const inp=document.getElementById('new-opp-extra-input');
+  if(!inp)return;
+  const name=inp.value.trim();
+  if(!name)return;
+  if(!G.extraLists)G.extraLists=[];
+  if(!G.extraLists.includes(name))G.extraLists.push(name);
+  save();renderStrike();renderExtraMatrix();
+}
+
 // Strike
 function renderStrike(){
   if(!G.selectedCombo)return;
@@ -1219,12 +1247,42 @@ function renderStrike(){
   const sc=getActiveSzenarien();
   const ci=sc.indexOf(r.scenario||'');
   const myLists=G.selectedCombo.map(i=>G.candidates[i]).filter(Boolean);
+  const hasTeam=r.teamIdx>=0&&G.tourneyTeams[r.teamIdx];
 
-  document.getElementById('opp-lists-input').innerHTML=r.oppLists.map((l,i)=>`
-    <div class="row">
-      <input type="text" value="${l}" placeholder="Gegner-Liste ${i+1}…"
-        oninput="G.rounds[${G.currentRound}].oppLists[${i}]=this.value;save();updateOppStrikeOpts();renderDecisionSelects()">
-    </div>`).join('');
+  // Opp lists
+  const oppListOpts=(sel)=>'<option value="">– Liste wählen –</option>'+
+    getVE().map(e=>`<option value="${e}"${sel===e?' selected':''}>${e}</option>`).join('')+
+    ((G.extraLists||[]).filter(e=>e.trim()).length?'<option disabled>── Extra-Listen ──</option>':'')+
+    (G.extraLists||[]).filter(e=>e.trim()).map(e=>`<option value="${e}"${sel===e?' selected':''}>${e}</option>`).join('');
+
+  if(hasTeam){
+    // Show team lists as dropdowns that update G.tourneyTeams directly
+    const team=G.tourneyTeams[r.teamIdx];
+    document.getElementById('opp-lists-input').innerHTML=
+      team.lists.map((l,i)=>`
+        <div class="row">
+          <select onchange="G.tourneyTeams[${r.teamIdx}].lists[${i}]={type:this.value.startsWith('extra:')?'extra':'meta',val:this.value.startsWith('extra:')?this.value.slice(6):this.value,manual:''};save();renderStrike();updateOppStrikeOpts();renderDecisionSelects()">
+            ${oppListOpts(l.type==='extra'?`extra:${l.val}`:l.val)}
+          </select>
+        </div>`).join('')+
+      `<div style="display:flex;gap:6px;margin-top:6px;align-items:center">
+        <input type="text" id="new-opp-extra-input" placeholder="Neue Liste anlegen…" style="flex:1">
+        <button class="btn btn-sm btn-primary" onclick="confirmAddOppExtraList()">+</button>
+      </div>`;
+  } else {
+    // Manual entry – save to r.oppLists
+    document.getElementById('opp-lists-input').innerHTML=
+      (r.oppLists||['','','','','']).map((l,i)=>`
+        <div class="row">
+          <select onchange="G.rounds[${G.currentRound}].oppLists[${i}]=this.value;save();updateOppStrikeOpts();renderDecisionSelects()">
+            ${oppListOpts(l)}
+          </select>
+        </div>`).join('')+
+      `<div style="display:flex;gap:6px;margin-top:6px;align-items:center">
+        <input type="text" id="new-opp-extra-input" placeholder="Neue Liste anlegen…" style="flex:1">
+        <button class="btn btn-sm btn-primary" onclick="confirmAddOppExtraList()">+</button>
+      </div>`;
+  }
   updateOppStrikeOpts();
 
   const scores=myLists.map((c,li)=>({name:c.name,li,avg:avgForList(G.selectedCombo[li],ci)}));
@@ -1256,7 +1314,7 @@ function renderStrike(){
   renderAttack();
 }
 function updateOppStrikeOpts(){
-  const r=R();const valid=r.oppLists.filter(l=>l.trim());
+  const r=R();const valid=getOppLists().filter(l=>l.trim());
   const sel=document.getElementById('opp-strike-sel');
   if(sel)sel.innerHTML='<option value="">– wählen –</option>'+valid.map(l=>`<option value="${l}"${r.oppStruck===l?' selected':''}>${l}</option>`).join('');
 }
@@ -1303,12 +1361,24 @@ function renderDecisionSelects(){
   const atkEl=document.getElementById('d-attacker');const poolEl=document.getElementById('d-pool');
   if(atkEl){atkEl.innerHTML=listOpts;if(r.attacker!=='')atkEl.value=r.attacker;}
   if(poolEl){poolEl.innerHTML=listOpts;if(r.pool!=='')poolEl.value=r.pool;}
-  const oppActive=r.oppLists.filter(l=>l.trim()&&l!==r.oppStruck);
+  const oppActive=getOppLists().filter(l=>l.trim()&&l!==r.oppStruck);
   const defOpts='<option value="">– wählen –</option>'+oppActive.map(l=>`<option value="${l}">${l}</option>`).join('');
   const daEl=document.getElementById('d-def-a');const dbEl=document.getElementById('d-def-b');
   if(daEl){daEl.innerHTML=defOpts;if(r.defA)daEl.value=r.defA;}
   if(dbEl){dbEl.innerHTML=defOpts;if(r.defB)dbEl.value=r.defB;}
   renderDecision();
+}
+
+function saveMasterVal(realLi,oppName,val,roundIdx){
+  const r=G.rounds[roundIdx];
+  const sc=getActiveSzenarien();
+  const ci=sc.indexOf(r.scenario||'');
+  if(ci<0){r.mRatings[`${realLi}_${oppName}`]=val;save();return;}
+  const ei=G.enemies.indexOf(oppName);
+  if(ei>=0){G.matrix[mkey(realLi,ei,ci)]=val;save();return;}
+  const xi=(G.extraLists||[]).indexOf(oppName);
+  if(xi>=0){if(!G.extraMatrix)G.extraMatrix={};G.extraMatrix[`${realLi}_${xi}_${ci}`]=val;save();return;}
+  r.mRatings[`${realLi}_${oppName}`]=val;save();
 }
 
 function renderDecision(){
@@ -1328,24 +1398,19 @@ function renderDecision(){
 
   document.getElementById('decision-cat-label').textContent=`Matchup · ${r.scenario||'kein Szenario'}`;
 
-  function getKnown(realLi,oppName){
+  function getMasterVal(realLi,oppName){
     const ei=G.enemies.indexOf(oppName);
-    if(ei>=0)return getR(realLi,ei,ci);
-    for(const team of G.tourneyTeams){
-      const mn=G.candidates[realLi]?.name;
-      if(mn&&team.ratings?.[mn]?.[oppName]?.[ci])return team.ratings[mn][oppName][ci];
-    }
-    return null;
+    if(ei>=0&&ci>=0)return getR(realLi,ei,ci)||'';
+    const xi=(G.extraLists||[]).indexOf(oppName);
+    if(xi>=0&&ci>=0)return(G.extraMatrix||{})[`${realLi}_${xi}_${ci}`]||'';
+    return R().mRatings[`${realLi}_${oppName}`]||'';
   }
 
   function mBlock(id,realLi,oppName,label){
-    const known=getKnown(realLi,oppName);
-    const cur=known||(r.mRatings[id]||'50');
-    if(known&&!r.mRatings[id])r.mRatings[id]=known;
+    const cur=getMasterVal(realLi,oppName)||'50';
     let html=`<div class="label" style="margin-bottom:4px">${label}</div>`;
-    if(known)html+=`<div style="margin-bottom:6px"><span class="chip chip-${known}" style="padding:4px 8px">${RATINGS.find(x=>x.val===known)?.label} (Matrix)</span></div>`;
     html+=`<select class="rating-sel r-${cur}" id="${id}"
-      onchange="G.rounds[${G.currentRound}].mRatings['${id}']=this.value;save();calcResult();this.className='rating-sel r-'+this.value">
+      onchange="saveMasterVal(${realLi},'${oppName.replace(/'/g,"\\'")}',this.value,${G.currentRound});calcResult();this.className='rating-sel r-'+this.value">
       ${RATINGS.map(rt=>`<option value="${rt.val}"${cur===rt.val?' selected':''}>${rt.label}</option>`).join('')}
     </select>`;
     return html;
@@ -1367,9 +1432,23 @@ function calcResult(){
   const poolIdx=r.pool!==''?parseInt(r.pool):-1;
   if(atkIdx<0||poolIdx<0||!r.defA||!r.defB)return;
   const myLists=G.selectedCombo.map(i=>G.candidates[i]).filter(Boolean);
-  const get=id=>getPts(r.mRatings[id]||'50');
-  const chooseA=get('atk_a')+get('pool_b');
-  const chooseB=get('atk_b')+get('pool_a');
+  const sc=getActiveSzenarien();
+  const ci=sc.indexOf(r.scenario||'');
+  const atkRealLi=G.selectedCombo[atkIdx];
+  const poolRealLi=G.selectedCombo[poolIdx];
+
+  function getVal(realLi,oppName){
+    if(ci>=0){
+      const ei=G.enemies.indexOf(oppName);
+      if(ei>=0)return getR(realLi,ei,ci)||'50';
+      const xi=(G.extraLists||[]).indexOf(oppName);
+      if(xi>=0)return(G.extraMatrix||{})[`${realLi}_${xi}_${ci}`]||'50';
+    }
+    return r.mRatings[`${realLi}_${oppName}`]||'50';
+  }
+
+  const chooseA=getPts(getVal(atkRealLi,r.defA))+getPts(getVal(poolRealLi,r.defB));
+  const chooseB=getPts(getVal(atkRealLi,r.defB))+getPts(getVal(poolRealLi,r.defA));
   const diff=Math.abs(chooseA-chooseB);const bestA=chooseA>=chooseB;
   document.getElementById('d-result').innerHTML=`
     <div class="matchup-box${bestA?' best':''}">
@@ -1392,7 +1471,7 @@ function renderResults(){
   if(!G.selectedCombo)return;
   const r=R();
   const myLists=G.selectedCombo.map(i=>G.candidates[i]).filter(Boolean);
-  const oppAvail=r.oppLists.filter(l=>l.trim()&&l!==r.oppStruck);
+  const oppAvail=getOppLists().filter(l=>l.trim()&&l!==r.oppStruck);
   let html='';
   [0,1,2,3].forEach(mi=>{
     const m=r.matchups[mi];
@@ -1404,7 +1483,9 @@ function renderResults(){
       else if(myP===opP){outcome='Unentschieden';oc='var(--yellow)';tp='1 Pkt';}
       else{outcome='Niederlage';oc='var(--red)';tp='0 Pkt';}
     }
-    const myOpts='<option value="">–</option>'+myLists.map((c,i)=>`<option value="${i}"${m.myList===String(i)?' selected':''}>${c.name}</option>`).join('');
+    const myStruck=r.myStruck!==''?parseInt(r.myStruck):-1;
+    const myOpts='<option value="">–</option>'+myLists.map((c,i)=>i===myStruck?'':
+      `<option value="${i}"${m.myList===String(i)?' selected':''}>${c.name}</option>`).join('');
     const oppOpts='<option value="">–</option>'+oppAvail.map(l=>`<option value="${l}"${m.oppList===l?' selected':''}>${l}</option>`).join('');
     html+=`<div class="card">
       <div style="font-size:11px;color:var(--text3);margin-bottom:10px;font-family:var(--mono)">Matchup ${mi+1}</div>
