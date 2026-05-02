@@ -429,6 +429,7 @@ const SK='mesbg_v1';
 let G={
   // Setup
   players:['','','',''],
+  teamName:'',
   candidates:[],
   enemies:[],
   matrix:{},
@@ -458,6 +459,7 @@ function save(){localStorage.setItem(SK,JSON.stringify(G));}
 function load(){
   try{const d=JSON.parse(localStorage.getItem(SK)||'{}');
     if(d.players)G.players=d.players;
+    if(d.teamName!==undefined)G.teamName=d.teamName;
     if(d.candidates)G.candidates=d.candidates;
     if(d.enemies)G.enemies=d.enemies;
     if(d.matrix)G.matrix=d.matrix;
@@ -633,7 +635,12 @@ function toggleScenario(name){
 
 // Players
 function renderPlayers(){
-  document.getElementById('player-inputs').innerHTML=G.players.map((p,i)=>`
+  document.getElementById('player-inputs').innerHTML=
+    `<div class="row" style="margin-bottom:14px">
+      <span class="hint" style="min-width:70px">Teamname</span>
+      <input type="text" value="${G.teamName||''}" placeholder="z.B. Team Deutschland..." oninput="G.teamName=this.value;save()">
+    </div>`+
+    G.players.map((p,i)=>`
     <div class="row">
       <span class="hint" style="min-width:70px">Spieler ${i+1}</span>
       <input type="text" value="${p}" placeholder="Name..." oninput="G.players[${i}]=this.value;save()">
@@ -1473,6 +1480,14 @@ function renderResults(){
   const myLists=G.selectedCombo.map(i=>G.candidates[i]).filter(Boolean);
   const oppAvail=getOppLists().filter(l=>l.trim()&&l!==r.oppStruck);
   let html='';
+  if(r.oppName){
+    const ourName=G.teamName||'Wir';
+    html+=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding:10px 14px;background:#fff;border:1px solid #ddd;border-radius:10px">
+      <span style="font-size:13px;font-weight:600;color:#1a1a1a">${ourName}</span>
+      <span style="font-size:13px;font-weight:600;color:#555">vs</span>
+      <span style="font-size:13px;font-weight:600;color:#1a1a1a">${r.oppName}</span>
+    </div>`;
+  }
   [0,1,2,3].forEach(mi=>{
     const m=r.matchups[mi];
     const myP=m.myPts!==null?parseInt(m.myPts):null;
@@ -1571,10 +1586,11 @@ function renderAuswUebersicht(){
     </div>`;
   });
   if(!html){wrap.innerHTML='<p class="hint">Noch keine Ergebnisse eingetragen.</p>';return;}
-  wrap.innerHTML=`<div class="card" style="border-color:var(--accent);background:#111a00;margin-bottom:12px">
+  const ourName=G.teamName||'Unser Team';
+  wrap.innerHTML=`<div class="card" style="border-color:#6ab820;background:#f4fbe8;margin-bottom:12px">
     <div style="display:flex;justify-content:space-between;align-items:center">
-      <span style="font-size:13px;font-weight:600">Gesamt</span>
-      <span style="font-size:28px;font-weight:600;font-family:var(--mono);color:var(--accent)">${totalPts} Pkt</span>
+      <span style="font-size:15px;font-weight:600;color:#1a1a1a">${ourName}</span>
+      <span style="font-size:28px;font-weight:600;font-family:var(--mono);color:#4a8c10">${totalPts} Pkt</span>
     </div>
   </div>`+html;
 }
