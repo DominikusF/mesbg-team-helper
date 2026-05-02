@@ -225,6 +225,9 @@ textarea.import-area{min-height:80px;font-size:13px;font-family:var(–mono)}
     <div class="hint" style="margin-bottom:12px">Liste wählen → pro Gegner und Szenario bewerten.</div>
     <div class="inner-tabs" id="matrix-list-tabs"></div>
     <div id="matrix-content"></div>
+    <div class="section-h">Extra-Listen Matrix</div>
+    <div class="hint" style="margin-bottom:12px">Listen die nicht in den Meta-Listen stehen aber bei Turnier-Teams verwendet werden.</div>
+    <div id="extra-matrix-wrap"></div>
     <div class="nav-footer">
       <button class="btn" onclick="goPhase(2)">← Zurück</button>
       <button class="btn btn-primary" onclick="goPhase(4)">Weiter →</button>
@@ -432,6 +435,8 @@ let G={
   selectedCombo:null,
   tourneyTeams:[],
   scenarios:[], // selected scenario names
+  extraLists:[], // non-meta lists used across tourney teams
+  extraMatrix:{}, // key: li_ei_ci where li=extraList index, ei=enemy index, ci=scenario index
   // Turnier
   currentRound:0,
   rounds:Array(5).fill(null).map(()=>({
@@ -459,6 +464,8 @@ function load(){
     if(d.selectedCombo!==undefined)G.selectedCombo=d.selectedCombo;
     if(d.tourneyTeams)G.tourneyTeams=d.tourneyTeams;
     if(d.scenarios)G.scenarios=d.scenarios;
+    if(d.extraLists)G.extraLists=d.extraLists;
+    if(d.extraMatrix)G.extraMatrix=d.extraMatrix;
     if(d.currentRound!==undefined)G.currentRound=d.currentRound;
     if(d.rounds)G.rounds=d.rounds;
   }catch(e){}
@@ -578,7 +585,7 @@ function goPhase(idx){
   currentPhaseIdx=idx;
   if(idx===1)renderCandidates();
   if(idx===2)renderScenarios();
-  if(idx===3){renderEnemies();renderMatrixTabs();}
+  if(idx===3){renderEnemies();renderMatrixTabs();renderExtraMatrix();}
   if(idx===4)renderPortfolio();
   if(idx===5)renderTourneyTeams();
   window.scrollTo(0,0);
@@ -663,6 +670,7 @@ function toggleCP(ci,pi){
 
 // Enemies + Matrix
 function removeEnemy(i){
+  const name=G.enemies[i];
   const newMatrix={};
   Object.keys(G.matrix).forEach(key=>{
     const parts=key.split('_');
@@ -672,6 +680,12 @@ function removeEnemy(i){
     else{newMatrix[key]=G.matrix[key];}
   });
   G.matrix=newMatrix;
+  // clean team entries pointing to this meta list
+  G.tourneyTeams.forEach(team=>{
+    team.lists=team.lists.map(l=>
+      l.type==='meta'&&l.val===name?{type:'meta',val:'',manual:''}:l
+    );
+  });
   G.enemies.splice(i,1);
   save();renderEnemies();renderMatrixContent();
 }
@@ -918,44 +932,82 @@ function pickCombo(idxArr){G.selectedCombo=idxArr;save();renderPortfolio();}
 
 // Tourney Teams
 function addTourneyTeam(){
-  G.tourneyTeams.push({name:'',lists:Array(5).fill(null).map(()=>({type:'meta',val:'',manual:''})),ratings:{}});
+  G.tourneyTeams.push({name:'',lists:Array(5).fill(null).map(()=>({type:'meta',val:'',manual:''})),ratings:{},open:false});
   save();renderTourneyTeams();
 }
 function getMetaOpts(sel){
-  return`<option value="">– Meta-Liste –</option>`+
-    getVE().map(e=>`<option value="${e}"${sel===e?' selected':''}>${e}</option>`).join('')+
-    `<option value="__manual__"${sel==='__manual__'?' selected':''}>✎ Manuell…</option>`;
+  const metaOpts=getVE().map(e=>`<option value="meta:${e}"${sel===`meta:${e}`?' selected':''}>${e}</option>`).join('');
+  const extraOpts=(G.extraLists||[]).filter(e=>e.trim()).map(e=>`<option value="extra:${e}"${sel===`extra:${e}`?' selected':''}>${e}</option>`).join('');
+  const sep=extraOpts?`<option disabled>── Extra-Listen ──</option>`:'';
+  return`<option value="">– Liste wählen –</option>${metaOpts}${sep}${extraOpts}`;
 }
 function onTTListChange(ti,li,val){
-  G.tourneyTeams[ti].lists[li]={type:val==='__manual__'?'manual':'meta',val:val==='__manual__'?'':val,manual:''};
+  if(val.startsWith('meta:')){
+    G.tourneyTeams[ti].lists[li]={type:'meta',val:val.slice(5),manual:''};
+  } else if(val.startsWith('extra:')){
+    G.tourneyTeams[ti].lists[li]={type:'extra',val:val.slice(6),manual:''};
+  } else {
+    G.tourneyTeams[ti].lists[li]={type:'meta',val:'',manual:''};
+  }
   save();renderTourneyTeams();
 }
 function getTTName(l){
   if(!l||typeof l==='string')return l||'';
-  return l.type==='manual'?l.manual||'':l.val||'';
+  if(l.type==='manual')return l.manual||'';
+  return l.val||'';
+}
+function confirmAddExtraList(ti){
+  const inp=document.getElementById(`new-extra-input-${ti}`);
+  if(!inp)return;
+  const name=inp.value.trim();
+  if(!name)return;
+  if(!G.extraLists)G.extraLists=[];
+  if(!G.extraLists.includes(name))G.extraLists.push(name);
+  save();renderTourneyTeams();renderExtraMatrix();
+}
+function toggleTT(ti){
+  G.tourneyTeams[ti].open=!G.tourneyTeams[ti].open;
+  save();renderTourneyTeams();
 }
 function renderTourneyTeams(){
   const wrap=document.getElementById('tourney-teams');
   if(!G.tourneyTeams.length){wrap.innerHTML='<p class="hint" style="margin-bottom:12px">Noch keine Teams.</p>';return;}
-  G.tourneyTeams.forEach(t=>{t.lists=t.lists.map(l=>typeof l==='string'?{type:'meta',val:l,manual:''}:l);});
-  wrap.innerHTML=G.tourneyTeams.map((team,ti)=>`
-    <div class="card">
-      <div style="display:flex;gap:8px;margin-bottom:12px">
-        <input type="text" value="${team.name}" placeholder="Teamname..." style="flex:1;font-weight:500"
+  G.tourneyTeams.forEach(t=>{
+    t.lists=t.lists.map(l=>typeof l==='string'?{type:'meta',val:l,manual:''}:l);
+  });
+  wrap.innerHTML=G.tourneyTeams.map((team,ti)=>{
+    const isOpen=team.open||false;
+    const lists=team.lists.map(l=>getTTName(l)).filter(l=>l.trim());
+    return`<div class="combo-card" style="margin-bottom:10px">
+      <div style="display:flex;gap:8px;align-items:center">
+        <input type="text" value="${team.name}" placeholder="Teamname..." style="flex:1;font-weight:600;font-size:14px;background:none;border:none;border-bottom:1px solid #ddd;border-radius:0;padding:4px 0"
           oninput="G.tourneyTeams[${ti}].name=this.value;save()">
         <button class="btn btn-sm btn-danger" onclick="G.tourneyTeams.splice(${ti},1);save();renderTourneyTeams()">×</button>
       </div>
-      <div class="label" style="margin-bottom:8px">5 Listen</div>
-      ${team.lists.map((l,li)=>`
-        <div style="margin-bottom:8px">
-          <select onchange="onTTListChange(${ti},${li},this.value)">${getMetaOpts(l.type==='manual'?'__manual__':l.val)}</select>
-          ${l.type==='manual'?`<input type="text" value="${l.manual||''}" placeholder="Listenname…" style="margin-top:6px"
-            oninput="G.tourneyTeams[${ti}].lists[${li}].manual=this.value;save()">`:''}</div>`).join('')}
-      <div class="divider"></div>
-      <div class="label" style="margin-bottom:6px">Matchup-Einschätzungen</div>
-      <div id="tt-mx-${ti}"></div>
-    </div>`).join('');
-  G.tourneyTeams.forEach((_,ti)=>renderTTMx(ti));
+      <div style="display:flex;flex-wrap:wrap;gap:4px;margin:8px 0">
+        ${lists.length?lists.map(l=>`<span class="tag">${l}</span>`).join(''):'<span class="hint">Noch keine Listen</span>'}
+      </div>
+      <div style="display:${isOpen?'block':'none'}">
+        <div class="divider"></div>
+        <div class="label" style="margin-bottom:8px">5 Listen</div>
+        ${team.lists.map((l,li)=>`
+          <div style="margin-bottom:8px">
+            <select onchange="onTTListChange(${ti},${li},this.value)">${getMetaOpts(l.type==='extra'?`extra:${l.val}`:`meta:${l.val}`)}</select>
+          </div>`).join('')}
+        <div style="display:flex;gap:6px;margin-bottom:12px;align-items:center">
+          <input type="text" id="new-extra-input-${ti}" placeholder="Neue Liste anlegen…" style="flex:1">
+          <button class="btn btn-sm btn-primary" onclick="confirmAddExtraList(${ti})">+</button>
+        </div>
+        <div class="divider"></div>
+        <div class="label" style="margin-bottom:6px">Matchup-Einschätzungen</div>
+        <div id="tt-mx-${ti}"></div>
+      </div>
+      <div style="text-align:center;margin-top:8px">
+        <button onclick="toggleTT(${ti})" style="background:none;border:none;cursor:pointer;font-size:18px;color:#888;padding:4px 16px">${isOpen?'▴':'▾'}</button>
+      </div>
+    </div>`;
+  }).join('');
+  G.tourneyTeams.forEach((_,ti)=>{if(G.tourneyTeams[ti].open)renderTTMx(ti);});
 }
 function renderTTMx(ti){
   const wrap=document.getElementById(`tt-mx-${ti}`);if(!wrap)return;
@@ -963,25 +1015,36 @@ function renderTTMx(ti){
   const validOpp=team.lists.map(l=>getTTName(l)).filter(l=>l.trim());
   if(!validOpp.length||!G.selectedCombo){wrap.innerHTML='<p class="hint">Erst finale 5 in Phase 4 wählen.</p>';return;}
   const myLists=G.selectedCombo.map(i=>G.candidates[i]).filter(Boolean);
+  const sc=getActiveSzenarien();
+  if(!sc.length){wrap.innerHTML='<p class="hint">Erst Szenarien in Phase 3 wählen.</p>';return;}
   let html='<div class="matrix-wrap"><table class="matrix-table"><thead><tr><th class="rh">Unsere Liste</th>';
-  CATS_S.forEach(c=>html+=`<th>${c}</th>`);html+='</tr></thead><tbody>';
+  sc.forEach(s=>html+=`<th style="min-width:60px">${s.length>8?s.slice(0,7)+'…':s}</th>`);
+  html+='</tr></thead><tbody>';
   myLists.forEach((myC,mli)=>{
     const li=G.candidates.indexOf(myC);
     validOpp.forEach((tl,tli)=>{
       const ei=G.enemies.indexOf(tl);const known=ei>=0;
-      html+=`<tr><td style="font-size:10px;color:var(--text2);padding:4px;line-height:1.3">
-        <span style="color:var(--text)">${myC.name}</span><br>vs ${tl}
+      html+=`<tr><td style="font-size:10px;color:#555;padding:4px;line-height:1.3">
+        <span style="color:#1a1a1a">${myC.name}</span><br>vs ${tl}
         ${known?'<span class="chip chip-lf" style="font-size:9px;padding:1px 4px">bekannt</span>':''}
       </td>`;
-      CATS.forEach((_,ci)=>{
+      sc.forEach((_,ci)=>{
+        const isExtra=G.extraLists&&G.extraLists.includes(tl);
         if(known){
           const v=getR(li,ei,ci);
-          html+=`<td style="text-align:center"><span class="chip chip-${v}">${chipLbl(v)}</span></td>`;
+          const key=`${li}_${ei}_${ci}`;
+          html+=`<td>${rSel(`ttmeta_${ti}_${mli}_${ei}_${ci}`,v,`G.matrix['${key}']=this.value;save()`)}</td>`;
+        } else if(isExtra){
+          const xi=(G.extraLists||[]).indexOf(tl);
+          if(!G.extraMatrix)G.extraMatrix={};
+          const key=`${li}_${xi}_${ci}`;
+          const v=G.extraMatrix[key]||'';
+          html+=`<td>${rSel(`ttex_${ti}_${mli}_${xi}_${ci}`,v,`updExtraMatrix(${li},${xi},${ci},this.value)`)}</td>`;
         } else {
           if(!team.ratings)team.ratings={};
           if(!team.ratings[myC.name])team.ratings[myC.name]={};
-          if(!team.ratings[myC.name][tl])team.ratings[myC.name][tl]=Array(4).fill('50');
-          const v=team.ratings[myC.name][tl][ci]||'50';
+          if(!team.ratings[myC.name][tl])team.ratings[myC.name][tl]=Array(sc.length).fill('');
+          const v=team.ratings[myC.name][tl][ci]||'';
           html+=`<td>${rSel(`tt_${ti}_${mli}_${tli}_${ci}`,v,`updTTR(${ti},'${myC.name}','${tl}',${ci},this.value)`)}</td>`;
         }
       });
@@ -993,8 +1056,74 @@ function renderTTMx(ti){
 function updTTR(ti,ml,el,ci,val){
   if(!G.tourneyTeams[ti].ratings)G.tourneyTeams[ti].ratings={};
   if(!G.tourneyTeams[ti].ratings[ml])G.tourneyTeams[ti].ratings[ml]={};
-  if(!G.tourneyTeams[ti].ratings[ml][el])G.tourneyTeams[ti].ratings[ml][el]=Array(4).fill('50');
-  G.tourneyTeams[ti].ratings[ml][el][ci]=val;save();
+  const sc=getActiveSzenarien();
+  if(!G.tourneyTeams[ti].ratings[ml][el])G.tourneyTeams[ti].ratings[ml][el]=Array(sc.length).fill('');
+  G.tourneyTeams[ti].ratings[ml][el][ci]=val;
+  save(); // just save, don't re-render
+}
+function updExtraMatrix(li,xi,ci,val){
+  if(!G.extraMatrix)G.extraMatrix={};
+  G.extraMatrix[`${li}_${xi}_${ci}`]=val;
+  save(); // just save, don't re-render
+}
+let extraMatrixTab=0;
+function renderExtraMatrix(){
+  const wrap=document.getElementById('extra-matrix-wrap');
+  if(!wrap)return;
+  const extraLists=(G.extraLists||[]).filter(e=>e.trim());
+  const sc=getActiveSzenarien();
+  const vc=getVC();
+  if(!extraLists.length){
+    wrap.innerHTML='<p class="hint">Noch keine Extra-Listen. Beim Anlegen in Turnier-Teams automatisch gespeichert.</p>';return;
+  }
+  if(!vc.length||!sc.length){wrap.innerHTML='<p class="hint">Erst Listen und Szenarien definieren.</p>';return;}
+  const myLists=G.selectedCombo?G.selectedCombo.map(i=>G.candidates[i]).filter(Boolean):vc;
+  if(extraMatrixTab>=myLists.length)extraMatrixTab=0;
+  let html='<div class="inner-tabs">';
+  myLists.forEach((c,ti)=>html+=`<div class="inner-tab${ti===extraMatrixTab?' active':''}" onclick="extraMatrixTab=${ti};renderExtraMatrix()">${c.name}</div>`);
+  html+='</div>';
+  const myC=myLists[extraMatrixTab];
+  const li=G.candidates.indexOf(myC);
+  html+='<div class="matrix-wrap"><table class="matrix-table"><thead><tr><th class="rh">Extra-Liste</th>';
+  sc.forEach(s=>html+=`<th style="min-width:80px">${s.length>8?s.slice(0,7)+'…':s}</th>`);
+  html+='</tr></thead><tbody>';
+  extraLists.forEach((extra,xi)=>{
+    html+=`<tr><td style="font-size:12px;padding:6px 4px;color:#555;white-space:nowrap">
+      <div style="display:flex;align-items:center;gap:4px">
+        ${extra}
+        <button onclick="removeExtraList(${xi})" style="background:none;border:none;color:#ccc;cursor:pointer;font-size:11px;flex-shrink:0">×</button>
+      </div>
+    </td>`;
+    sc.forEach((_,ci)=>{
+      const key=`${li}_${xi}_${ci}`;
+      const val=(G.extraMatrix||{})[key]||'';
+      html+=`<td>${rSel(`exmx_${li}_${xi}_${ci}`,val,`updExtraMatrix(${li},${xi},${ci},this.value)`)}</td>`;
+    });
+    html+='</tr>';
+  });
+  html+='</tbody></table></div>';
+  wrap.innerHTML=html;
+}
+function removeExtraList(xi){
+  const name=G.extraLists[xi];
+  // clean extraMatrix
+  const newMatrix={};
+  Object.keys(G.extraMatrix||{}).forEach(key=>{
+    const parts=key.split('_');
+    const li=parseInt(parts[0]),eiN=parseInt(parts[1]),ci=parseInt(parts[2]);
+    if(eiN===xi)return;
+    if(eiN>xi)newMatrix[`${li}_${eiN-1}_${ci}`]=G.extraMatrix[key];
+    else newMatrix[key]=G.extraMatrix[key];
+  });
+  G.extraMatrix=newMatrix;
+  // clean team entries pointing to this extra list
+  G.tourneyTeams.forEach(team=>{
+    team.lists=team.lists.map(l=>
+      l.type==='extra'&&l.val===name?{type:'meta',val:'',manual:''}:l
+    );
+  });
+  G.extraLists.splice(xi,1);
+  save();renderExtraMatrix();renderTourneyTeams();
 }
 
 // ══════════════════════════════════════════════════════════════════
