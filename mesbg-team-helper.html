@@ -169,6 +169,7 @@ textarea.import-area{min-height:80px;font-size:13px;font-family:var(–mono)}
     <div class="burger-menu" id="burger-menu">
       <div class="bmenu-item" onclick="doFullExport()">↑ Exportieren</div>
       <div class="bmenu-item" onclick="showImportPanel()">↓ Importieren</div>
+      <div class="bmenu-item" onclick="loadTestData()">🧪 Testdaten laden</div>
       <div class="bmenu-item danger" onclick="confirmReset()">⚠ Reset</div>
     </div>
   </div>
@@ -415,11 +416,11 @@ function getActiveSzenarien(){return(G.scenarios||[]).filter(n=>ALL_SCENARIOS.fi
 function CATS_arr(){return getActiveSzenarien();}
 function CATS_S_arr(){return getActiveSzenarien().map(n=>n.length>12?n.slice(0,10)+'…':n);}
 const RATINGS=[
-  {val:'kf',label:'++',pts:1.4},
-  {val:'lf',label:'+',pts:1.2},
+  {val:'kf',label:'++',pts:2.0},
+  {val:'lf',label:'+',pts:1.5},
   {val:'50',label:'0',pts:1.0},
-  {val:'lu',label:'−',pts:0.7},
-  {val:'ku',label:'−−',pts:0.2}
+  {val:'lu',label:'−',pts:0.5},
+  {val:'ku',label:'−−',pts:0.0}
 ];
 const SK='mesbg_v1';
 
@@ -1479,6 +1480,8 @@ function renderResults(){
   const r=R();
   const myLists=G.selectedCombo.map(i=>G.candidates[i]).filter(Boolean);
   const oppAvail=getOppLists().filter(l=>l.trim()&&l!==r.oppStruck);
+  const myStruck=r.myStruck!==''?parseInt(r.myStruck):-1;
+  const activePlayers=getAP(); // [{p,i}] – nur Spieler mit Namen
   let html='';
   if(r.oppName){
     const ourName=G.teamName||'Wir';
@@ -1488,22 +1491,23 @@ function renderResults(){
       <span style="font-size:13px;font-weight:600;color:#1a1a1a">${r.oppName}</span>
     </div>`;
   }
+  // 4 Slots = 4 Spieler (Slot-Index = Spieler-Index in G.players)
   [0,1,2,3].forEach(mi=>{
+    const playerName=G.players[mi]||`Spieler ${mi+1}`;
     const m=r.matchups[mi];
     const myP=m.myPts!==null?parseInt(m.myPts):null;
     const opP=m.oppPts!==null?parseInt(m.oppPts):null;
-    let outcome='',oc='var(--text3)',tp='';
+    let outcome='',oc='#888',tp='';
     if(myP!==null&&opP!==null){
-      if(myP>opP){outcome='Sieg';oc='var(--kf)';tp='2 Pkt';}
-      else if(myP===opP){outcome='Unentschieden';oc='var(--yellow)';tp='1 Pkt';}
-      else{outcome='Niederlage';oc='var(--red)';tp='0 Pkt';}
+      if(myP>opP){outcome='Sieg';oc='#4a8c10';tp='2 Pkt';}
+      else if(myP===opP){outcome='Unentschieden';oc='#b08000';tp='1 Pkt';}
+      else{outcome='Niederlage';oc='#c00';tp='0 Pkt';}
     }
-    const myStruck=r.myStruck!==''?parseInt(r.myStruck):-1;
-    const myOpts='<option value="">–</option>'+myLists.map((c,i)=>i===myStruck?'':
+    const myOpts='<option value="">– Liste –</option>'+myLists.map((c,i)=>i===myStruck?'':
       `<option value="${i}"${m.myList===String(i)?' selected':''}>${c.name}</option>`).join('');
-    const oppOpts='<option value="">–</option>'+oppAvail.map(l=>`<option value="${l}"${m.oppList===l?' selected':''}>${l}</option>`).join('');
+    const oppOpts='<option value="">– Liste –</option>'+oppAvail.map(l=>`<option value="${l}"${m.oppList===l?' selected':''}>${l}</option>`).join('');
     html+=`<div class="card">
-      <div style="font-size:11px;color:var(--text3);margin-bottom:10px;font-family:var(--mono)">Matchup ${mi+1}</div>
+      <div style="font-size:14px;font-weight:600;color:#1a1a1a;margin-bottom:12px">${playerName}</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
         <div><div class="label">Unsere Liste</div>
           <select style="font-size:13px" onchange="G.rounds[${G.currentRound}].matchups[${mi}].myList=this.value;save()">${myOpts}</select>
@@ -1517,14 +1521,14 @@ function renderResults(){
           <input type="number" min="0" max="20" value="${myP??''}" placeholder="0"
             oninput="G.rounds[${G.currentRound}].matchups[${mi}].myPts=this.value===''?null:parseInt(this.value);save();renderResults()">
         </div>
-        <div style="color:var(--text3);margin-top:14px">:</div>
+        <div style="color:#888;margin-top:14px">:</div>
         <div><div class="label">Gegner Pkt</div>
           <input type="number" min="0" max="20" value="${opP??''}" placeholder="0"
             oninput="G.rounds[${G.currentRound}].matchups[${mi}].oppPts=this.value===''?null:parseInt(this.value);save();renderResults()">
         </div>
         <div style="margin-top:14px;flex:1;text-align:right">
           <div style="font-size:13px;font-weight:600;color:${oc}">${outcome}</div>
-          <div style="font-size:11px;font-family:var(--mono);color:var(--text3)">${tp}</div>
+          <div style="font-size:11px;font-family:var(--mono);color:#888">${tp}</div>
         </div>
       </div>
     </div>`;
@@ -1566,44 +1570,148 @@ function renderAuswertung(){
 function renderAuswUebersicht(){
   const wrap=document.getElementById('eval-uebersicht');
   let totalPts=0;let html='';
+
+  // Per-player stats: wins, upsets (won despite − or −−), badMatchups (played − or −−), bestDiff
+  const pStats=G.players.map((_,pi)=>({wins:0,upsets:0,badMatchups:0,bestDiff:-999,bestDiffOpp:'',sniper:0}));
+
   G.rounds.forEach((r,ri)=>{
     if(!r.matchups.some(m=>m.myPts!==null))return;
     let rPts=0;let rMy=0;let rOpp=0;
-    r.matchups.forEach(m=>{
+    r.matchups.forEach((m,mi)=>{
       if(m.myPts===null)return;
       const mp=parseInt(m.myPts),op=parseInt(m.oppPts);
       rMy+=mp;rOpp+=op;
       if(mp>op)rPts+=2;else if(mp===op)rPts+=1;
+
+      // Player stats (slot mi = player mi)
+      const ps=pStats[mi];if(!ps)return;
+      const won=mp>op;
+      const diff=mp-op;
+      if(diff>ps.bestDiff){ps.bestDiff=diff;ps.bestDiffOpp=r.oppName||`R${ri+1}`;}
+
+      // Matchup quality for this player's list in this round
+      const myListIdx=m.myList!==''?parseInt(m.myList):-1;
+      let expR=null;
+      if(myListIdx>=0&&G.selectedCombo){
+        const realLi=G.selectedCombo[myListIdx];
+        const ei=G.enemies.indexOf(m.oppList);
+        const ci=getActiveSzenarien().indexOf(r.scenario||'');
+        if(ei>=0&&ci>=0)expR=getR(realLi,ei,ci);
+      }
+      const isBad=expR==='lu'||expR==='ku';
+      if(isBad)ps.badMatchups++;
+      if(won){
+        ps.wins++;
+        if(isBad)ps.upsets++;
+      }
     });
     totalPts+=rPts;
-    const oc=rPts>=6?'var(--kf)':rPts>=4?'var(--yellow)':'var(--red)';
+    const oc=rPts>=6?'#4a8c10':rPts>=4?'#b08000':'#c00';
     html+=`<div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
         <span style="font-size:13px;font-weight:500">Runde ${ri+1}${r.oppName?' · '+r.oppName:''}</span>
         <span style="font-size:20px;font-weight:600;font-family:var(--mono);color:${oc}">${rPts}/8</span>
       </div>
-      <div style="font-size:12px;font-family:var(--mono);color:var(--text3)">${r.scenario||'–'} · ${rMy}:${rOpp}</div>
+      <div style="font-size:12px;font-family:var(--mono);color:#888">${r.scenario||'–'} · ${rMy}:${rOpp}</div>
     </div>`;
   });
+
   if(!html){wrap.innerHTML='<p class="hint">Noch keine Ergebnisse eingetragen.</p>';return;}
+
+  // Build achievements
+  const playedPlayers=G.players.map((p,i)=>({p,i,s:pStats[i]})).filter(x=>x.p.trim());
+  let achHTML='';
+
+  // 🏆 Carry – meiste Siege
+  const maxWins=Math.max(...playedPlayers.map(x=>x.s.wins));
+  if(maxWins>0){
+    const carries=playedPlayers.filter(x=>x.s.wins===maxWins);
+    achHTML+=achCard('🏆','Carry',carries.map(x=>x.p).join(', '),`${maxWins} Siege`,'#f0f8e0','#6ab820');
+  }
+
+  // ⚡ Überraschung – meiste Siege trotz − oder −−
+  const maxUpsets=Math.max(...playedPlayers.map(x=>x.s.upsets));
+  if(maxUpsets>0){
+    const upsetters=playedPlayers.filter(x=>x.s.upsets===maxUpsets);
+    achHTML+=achCard('⚡','Überraschung',upsetters.map(x=>x.p).join(', '),`${maxUpsets}× Sieg trotz − oder −−`,'#fff8e0','#e0a020');
+  }
+
+  // 🐐 Sündenbock – meiste Spiele mit − oder −−
+  const maxBad=Math.max(...playedPlayers.map(x=>x.s.badMatchups));
+  if(maxBad>0){
+    const goats=playedPlayers.filter(x=>x.s.badMatchups===maxBad);
+    achHTML+=achCard('🐐','Sündenbock',goats.map(x=>x.p).join(', '),`${maxBad}× mit − oder −− gespielt`,'#fff0f0','#c04040');
+  }
+
+  // 🎯 Sniper – höchste Punktedifferenz in einem Spiel
+  const maxDiff=Math.max(...playedPlayers.map(x=>x.s.bestDiff));
+  if(maxDiff>0){
+    const snipers=playedPlayers.filter(x=>x.s.bestDiff===maxDiff);
+    achHTML+=achCard('🎯','Sniper',snipers.map(x=>x.p).join(', '),`+${maxDiff} Pkt (vs ${snipers[0].s.bestDiffOpp})`,'#e8f0ff','#4060c0');
+  }
+
+  // ⚔️ Duellant – häufigster Angreifer
+  const atkCounts=G.players.map((_,pi)=>0);
+  G.rounds.forEach(r=>{
+    if(r.attacker===''||r.attacker===undefined)return;
+    const atkListIdx=parseInt(r.attacker);
+    if(isNaN(atkListIdx)||!G.selectedCombo)return;
+    // attacker is a list index in selectedCombo; find which player owns it
+    const realLi=G.selectedCombo[atkListIdx];
+    const cand=G.candidates[realLi];
+    if(!cand||!cand.players.length)return;
+    cand.players.forEach(pi=>{if(pi<atkCounts.length)atkCounts[pi]++;});
+  });
+  const maxAtk=Math.max(...atkCounts);
+  if(maxAtk>0){
+    const duellants=G.players.map((p,i)=>({p,i})).filter(x=>x.p.trim()&&atkCounts[x.i]===maxAtk);
+    achHTML+=achCard('⚔️','Duellant',duellants.map(x=>x.p).join(', '),`${maxAtk}× als Angreifer`,'#f5f0ff','#8040c0');
+  }
+
+  // 🛡️ Held der Niederlage – engste Niederlage
+  let closestLoss=999;let closestLossPlayer='';let closestLossScore='';
+  G.rounds.forEach(r=>{
+    r.matchups.forEach((m,mi)=>{
+      if(m.myPts===null)return;
+      const mp=parseInt(m.myPts),op=parseInt(m.oppPts);
+      if(op>mp){
+        const gap=op-mp;
+        if(gap<closestLoss){closestLoss=gap;closestLossPlayer=G.players[mi]||`Spieler ${mi+1}`;closestLossScore=`${mp}:${op}`;}
+      }
+    });
+  });
+  if(closestLossPlayer){
+    achHTML+=achCard('🛡️','Held der Niederlage',closestLossPlayer,`Engste Niederlage ${closestLossScore}`,'#f0f5ff','#4080c0');
+  }
+
   const ourName=G.teamName||'Unser Team';
   wrap.innerHTML=`<div class="card" style="border-color:#6ab820;background:#f4fbe8;margin-bottom:12px">
     <div style="display:flex;justify-content:space-between;align-items:center">
       <span style="font-size:15px;font-weight:600;color:#1a1a1a">${ourName}</span>
       <span style="font-size:28px;font-weight:600;font-family:var(--mono);color:#4a8c10">${totalPts} Pkt</span>
     </div>
-  </div>`+html;
+  </div>`+(achHTML?`<div class="section-h">Achievements</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">${achHTML}</div>`:'')+html;
+}
+
+function achCard(emoji,title,name,sub,bg,border){
+  return`<div style="background:${bg};border:1px solid ${border};border-radius:10px;padding:12px">
+    <div style="font-size:22px;margin-bottom:4px">${emoji}</div>
+    <div style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">${title}</div>
+    <div style="font-size:14px;font-weight:600;color:#1a1a1a">${name}</div>
+    <div style="font-size:11px;color:#888;margin-top:2px">${sub}</div>
+  </div>`;
 }
 
 function renderAuswMatchups(){
   const wrap=document.getElementById('eval-matchups');
-  let correct=0;let total=0;let html='';
+  let diffSum=0;let total=0;let html='';
+  const correct=diffSum; // alias for summary
   const myLists=G.selectedCombo?G.selectedCombo.map(i=>G.candidates[i]).filter(Boolean):[];
 
   G.rounds.forEach((r,ri)=>{
     if(!r.matchups.some(m=>m.myPts!==null))return;
     html+=`<div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin:16px 0 8px">Runde ${ri+1}${r.oppName?' · '+r.oppName:''}</div><div class="card">`;
-    r.matchups.forEach(m=>{
+    r.matchups.forEach((m,mi)=>{
       if(m.myPts===null||!m.myList)return;
       const mp=parseInt(m.myPts),op=parseInt(m.oppPts);
       const myListIdx=parseInt(m.myList);
@@ -1614,25 +1722,28 @@ function renderAuswMatchups(){
         const ci=getActiveSzenarien().indexOf(r.scenario||'');
         if(ci>=0)expR=getR(realLi,ei,ci);
       }
-      let out='',oc='var(--text3)';
-      if(mp>op){out='Sieg';oc='var(--kf)';}else if(mp===op){out='Unentschieden';oc='var(--yellow)';}else{out='Niederlage';oc='var(--red)';}
-      let match=null;
+      let out='',oc='#888';
+      if(mp>op){out='Sieg';oc='#4a8c10';}else if(mp===op){out='Unentschieden';oc='#b08000';}else{out='Niederlage';oc='#c00';}
+      let diff=null;
       if(expR){
         total++;
         const expPts=getPts(expR);
-        const actW=mp>op,actD=mp===op,expW=expPts>1.0,expD=Math.abs(expPts-1.0)<0.1;
-        if((actW&&expW)||(actD&&expD)||(!actW&&!actD&&!expW&&!expD)){match=true;correct++;}else match=false;
+        const actPts=mp>op?2.0:mp===op?1.0:0.0;
+        diff=actPts-expPts;
+        diffSum+=diff;
       }
       const myName=myLists[myListIdx]?.name||'?';
+      const playerName=G.players[mi]||`Spieler ${mi+1}`;
       html+=`<div class="eval-row">
         <div>
+          <div style="font-size:12px;font-weight:600;color:#4a8c10;margin-bottom:2px">${playerName}</div>
           <div style="font-size:13px">${myName} vs ${m.oppList||'?'}</div>
           ${expR?`<div class="hint">Erwartet: <span class="chip chip-${expR}">${RATINGS.find(x=>x.val===expR)?.label}</span></div>`:'<div class="hint">Kein Matchup-Wert</div>'}
         </div>
         <div style="text-align:right;flex-shrink:0">
           <div style="font-size:13px;font-weight:600;color:${oc}">${out}</div>
-          <div style="font-size:11px;font-family:var(--mono);color:var(--text3)">${mp}:${op}</div>
-          ${match!==null?`<div style="font-size:10px;color:${match?'var(--kf)':'var(--red)'}">${match?'✓ korrekt':'✗ falsch'}</div>`:''}
+          <div style="font-size:11px;font-family:var(--mono);color:#888">${mp}:${op}</div>
+          ${diff!==null?`<div style="font-size:11px;font-family:var(--mono);color:${diff>0?'#4a8c10':diff<0?'#c00':'#888'};font-weight:600">${diff>0?'+':''}${diff.toFixed(1)}</div>`:''}
         </div>
       </div>`;
     });
@@ -1640,11 +1751,127 @@ function renderAuswMatchups(){
   });
 
   if(!html){wrap.innerHTML='<p class="hint">Noch keine Ergebnisse eingetragen.</p>';return;}
-  const summary=total>0?`<div class="card" style="margin-bottom:12px;border-color:var(--border2)">
-    <div style="font-size:13px;color:var(--text2)">Einschätzungen korrekt</div>
-    <div style="font-size:22px;font-weight:600;font-family:var(--mono);color:var(--accent);margin-top:4px">${correct}/${total} (${Math.round(correct/total*100)}%)</div>
+  const avgDiff=total>0?diffSum/total:0;
+  const summary=total>0?`<div class="card" style="margin-bottom:12px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div>
+        <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:.05em">Ø Abweichung</div>
+        <div style="font-size:22px;font-weight:600;font-family:var(--mono);color:${avgDiff>=0?'#4a8c10':'#c00'};margin-top:4px">${avgDiff>=0?'+':''}${avgDiff.toFixed(2)}</div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:.05em">Gesamt</div>
+        <div style="font-size:22px;font-weight:600;font-family:var(--mono);color:${diffSum>=0?'#4a8c10':'#c00'};margin-top:4px">${diffSum>=0?'+':''}${diffSum.toFixed(1)}</div>
+      </div>
+    </div>
+    <div style="font-size:11px;color:#888;margin-top:8px">${total} bewertete Matchups</div>
   </div>`:'';
   wrap.innerHTML=summary+html;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// TESTDATEN
+// ══════════════════════════════════════════════════════════════════
+function loadTestData(){
+  closeBurger();
+  const td={
+    players:['Anna','Ben','Clara','David'],
+    teamName:'Die Grüne Flut',
+    candidates:[
+      {name:'Gondor',players:[0]},
+      {name:'Rohan',players:[1]},
+      {name:'Elfen',players:[2]},
+      {name:'Zwerge',players:[3]},
+      {name:'Armee des Todes',players:[0,1]},
+      {name:'Ringgeister',players:[2]},
+      {name:'Isengard',players:[3]}
+    ],
+    enemies:['Mordor','Angmar','Goblins','Easterlins'],
+    scenarios:['Domination','To the Death','Hold Ground'],
+    // matrix: key = li_ei_ci
+    // li=0 Gondor, li=1 Rohan, li=2 Elfen, li=3 Zwerge, li=4 Armee des Todes
+    // ei=0 Mordor, ei=1 Angmar, ei=2 Goblins, ei=3 Easterlins
+    // ci=0 Domination, ci=1 To the Death, ci=2 Hold Ground
+    matrix:{
+      '0_0_0':'lf','0_0_1':'kf','0_0_2':'lf',
+      '0_1_0':'50','0_1_1':'lu','0_1_2':'50',
+      '0_2_0':'kf','0_2_1':'lf','0_2_2':'kf',
+      '0_3_0':'lu','0_3_1':'50','0_3_2':'lu',
+      '1_0_0':'kf','1_0_1':'kf','1_0_2':'lf',
+      '1_1_0':'lu','1_1_1':'ku','1_1_2':'lu',
+      '1_2_0':'50','1_2_1':'50','1_2_2':'lf',
+      '1_3_0':'lu','1_3_1':'50','1_3_2':'50',
+      '2_0_0':'kf','2_0_1':'kf','2_0_2':'kf',
+      '2_1_0':'lf','2_1_1':'50','2_1_2':'lf',
+      '2_2_0':'lu','2_2_1':'lu','2_2_2':'50',
+      '2_3_0':'ku','2_3_1':'lu','2_3_2':'lu',
+      '3_0_0':'50','3_0_1':'50','3_0_2':'lf',
+      '3_1_0':'kf','3_1_1':'lf','3_1_2':'50',
+      '3_2_0':'lu','3_2_1':'lu','3_2_2':'50',
+      '3_3_0':'lu','3_3_1':'ku','3_3_2':'lu',
+      '4_0_0':'kf','4_0_1':'kf','4_0_2':'lf',
+      '4_1_0':'lu','4_1_1':'lu','4_1_2':'50',
+      '4_2_0':'50','4_2_1':'50','4_2_2':'lf',
+      '4_3_0':'kf','4_3_1':'50','4_3_2':'lf'
+    },
+    selectedCombo:[0,1,2,3,4],
+    tourneyTeams:[],
+    extraLists:[],
+    extraMatrix:{},
+    currentRound:2,
+    rounds:[
+      // Runde 1: Domination vs Team Sauron → 5 Pkt (Sieg, Nied., Sieg, Unent.)
+      {
+        scenario:'Domination',oppName:'Team Sauron',
+        oppLists:['Mordor','Angmar','Goblins','Easterlins',''],
+        teamIdx:-1,oppStruck:'Goblins',myStruck:'4',
+        attacker:'0',pool:'1',defA:'Mordor',defB:'Angmar',mRatings:{},
+        matchups:[
+          {myList:'0',oppList:'Mordor',myPts:14,oppPts:8},    // Sieg, erwartet lf (korrekt)
+          {myList:'1',oppList:'Angmar',myPts:6,oppPts:12},    // Niederl., erwartet ku (korrekt)
+          {myList:'2',oppList:'Mordor',myPts:12,oppPts:10},   // Sieg, erwartet kf (korrekt)
+          {myList:'3',oppList:'Easterlins',myPts:8,oppPts:8}  // Unent., erwartet lu (falsch)
+        ]
+      },
+      // Runde 2: To the Death vs Team Saruman → 5 Pkt
+      {
+        scenario:'To the Death',oppName:'Team Saruman',
+        oppLists:['Goblins','Easterlins','Mordor','Angmar',''],
+        teamIdx:-1,oppStruck:'Angmar',myStruck:'2',
+        attacker:'1',pool:'0',defA:'Goblins',defB:'Easterlins',mRatings:{},
+        matchups:[
+          {myList:'0',oppList:'Goblins',myPts:16,oppPts:6},   // Sieg, erwartet kf (korrekt)
+          {myList:'1',oppList:'Easterlins',myPts:8,oppPts:10},// Niederl., erwartet 50 (falsch)
+          {myList:'3',oppList:'Goblins',myPts:10,oppPts:10},  // Unent., erwartet lu (falsch)
+          {myList:'4',oppList:'Mordor',myPts:12,oppPts:8}     // Sieg, erwartet kf (korrekt)
+        ]
+      },
+      // Runde 3: Hold Ground vs Team Gandalf → 4 Pkt
+      {
+        scenario:'Hold Ground',oppName:'Team Gandalf',
+        oppLists:['Angmar','Easterlins','Goblins','Mordor',''],
+        teamIdx:-1,oppStruck:'Goblins',myStruck:'0',
+        attacker:'1',pool:'3',defA:'Angmar',defB:'Easterlins',mRatings:{},
+        matchups:[
+          {myList:'1',oppList:'Angmar',myPts:5,oppPts:14},    // Niederl., erwartet ku (korrekt)
+          {myList:'2',oppList:'Easterlins',myPts:11,oppPts:9},// Sieg, erwartet lu (falsch)
+          {myList:'3',oppList:'Mordor',myPts:10,oppPts:10},   // Unent., erwartet lf (falsch)
+          {myList:'4',oppList:'Angmar',myPts:14,oppPts:7}     // Sieg, erwartet 50 (korrekt)
+        ]
+      },
+      // Runden 4+5 leer
+      {scenario:'',oppName:'',oppLists:['','','','',''],teamIdx:-1,oppStruck:'',myStruck:'',attacker:'',pool:'',defA:'',defB:'',mRatings:{},matchups:[{myList:'',oppList:'',myPts:null,oppPts:null},{myList:'',oppList:'',myPts:null,oppPts:null},{myList:'',oppList:'',myPts:null,oppPts:null},{myList:'',oppList:'',myPts:null,oppPts:null}]},
+      {scenario:'',oppName:'',oppLists:['','','','',''],teamIdx:-1,oppStruck:'',myStruck:'',attacker:'',pool:'',defA:'',defB:'',mRatings:{},matchups:[{myList:'',oppList:'',myPts:null,oppPts:null},{myList:'',oppList:'',myPts:null,oppPts:null},{myList:'',oppList:'',myPts:null,oppPts:null},{myList:'',oppList:'',myPts:null,oppPts:null}]}
+    ]
+  };
+  localStorage.setItem(SK,JSON.stringify(td));
+  Object.assign(G,td);
+  renderPlayers();
+  renderCandidates();
+  renderEnemies();
+  renderMatrixTabs();
+  renderExtraMatrix();
+  renderTourneyTeams();
+  setMode('auswertung');
 }
 
 // ══════════════════════════════════════════════════════════════════
