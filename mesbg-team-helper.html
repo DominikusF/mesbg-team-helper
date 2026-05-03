@@ -739,7 +739,8 @@ function renderExtraEnemyInputs(){
 }
 function renderMatrixTabs(){
   const vc=getVC();if(matrixTab>=vc.length)matrixTab=0;
-  document.getElementById('matrix-list-tabs').innerHTML=vc.map((c,ti)=>`
+  const tabsEl=document.getElementById('matrix-list-tabs');if(!tabsEl)return;
+  tabsEl.innerHTML=vc.map((c,ti)=>`
     <div class="inner-tab${ti===matrixTab?' active':''}" onclick="matrixTab=${ti};renderMatrixTabs()">${c.name||'Liste '+(ti+1)}</div>`).join('');
   renderMatrixContent();
 }
@@ -747,6 +748,7 @@ function renderMatrixContent(){
   const vc=getVC();const ve=getVE();const wrap=document.getElementById('matrix-content');
   const sc=getActiveSzenarien();
   const extras=(G.extraLists||[]).filter(e=>e.trim());
+  if(!wrap)return;
   if(!vc.length){wrap.innerHTML='<p class="hint">Erst Listen in Phase 2.</p>';return;}
   if(!ve.length&&!extras.length){wrap.innerHTML='<p class="hint">Erst Gegner-Listen oben eintragen.</p>';return;}
   if(!sc.length){wrap.innerHTML='<p class="hint">Erst Szenarien in Phase 3 wählen.</p>';return;}
