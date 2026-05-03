@@ -184,7 +184,7 @@ textarea.import-area{min-height:80px;font-size:13px;font-family:var(–mono)}
     <div class="stab active" onclick="goPhase(0)">1 · Team</div>
     <div class="stab" onclick="goPhase(1)">2 · Listen</div>
     <div class="stab" onclick="goPhase(2)">3 · Szenarien</div>
-    <div class="stab" onclick="goPhase(3)">4 · Matchups</div>
+    <div class="stab" onclick="goPhase(3)">4 · Meta & Matrix</div>
     <div class="stab" onclick="goPhase(4)">5 · Portfolio</div>
     <div class="stab" onclick="goPhase(5)">6 · Turnier-Teams</div>
   </div>
@@ -217,19 +217,18 @@ textarea.import-area{min-height:80px;font-size:13px;font-family:var(–mono)}
   </div>
 
   <div class="content phase" id="phase-3">
-    <div class="section-h" style="margin-top:0">Matchup-Matrix</div>
+    <div class="card">
+      <div class="card-title">Gegner-Listen (Meta)</div>
+      <div id="enemy-inputs"></div>
+      <button class="btn btn-sm" onclick="addEnemy()" style="margin-top:4px">+ Gegner hinzufügen</button>
+    </div>
+    <div class="section-h">Matchup-Matrix</div>
     <div class="hint" style="margin-bottom:12px">Liste wählen → pro Gegner und Szenario bewerten.</div>
     <div class="inner-tabs" id="matrix-list-tabs"></div>
     <div id="matrix-content"></div>
-    <div class="card" style="margin-top:16px">
-      <div class="card-title">Gegner-Listen</div>
-      <div id="enemy-inputs"></div>
-      <button class="btn btn-sm" onclick="addEnemy()" style="margin-top:4px">+ Meta-Gegner hinzufügen</button>
-      <div class="divider"></div>
-      <div class="label" style="margin-bottom:6px">Extra-Listen</div>
-      <div id="extra-enemy-inputs"></div>
-      <button class="btn btn-sm" onclick="addExtraEnemy()" style="margin-top:4px">+ Extra-Liste hinzufügen</button>
-    </div>
+    <div class="section-h">Extra-Listen Matrix</div>
+    <div class="hint" style="margin-bottom:12px">Listen die nicht in den Meta-Listen stehen aber bei Turnier-Teams verwendet werden.</div>
+    <div id="extra-matrix-wrap"></div>
     <div class="nav-footer">
       <button class="btn" onclick="goPhase(2)">← Zurück</button>
       <button class="btn btn-primary" onclick="goPhase(4)">Weiter →</button>
@@ -603,7 +602,7 @@ function goPhase(idx){
   currentPhaseIdx=idx;
   if(idx===1)renderCandidates();
   if(idx===2)renderScenarios();
-  if(idx===3){renderEnemies();renderMatrixTabs();}
+  if(idx===3){renderEnemies();renderMatrixTabs();renderExtraMatrix();}
   if(idx===4)renderPortfolio();
   if(idx===5)renderTourneyTeams();
   window.scrollTo(0,0);
@@ -713,11 +712,6 @@ function removeEnemy(i){
   save();renderEnemies();renderMatrixContent();
 }
 function addEnemy(){G.enemies.push('');save();renderEnemies();renderMatrixTabs();}
-function addExtraEnemy(){
-  if(!G.extraLists)G.extraLists=[];
-  G.extraLists.push('');
-  save();renderExtraEnemyInputs();renderMatrixContent();
-}
 function renderEnemies(){
   document.getElementById('enemy-inputs').innerHTML=G.enemies.map((e,i)=>`
     <div class="row">
@@ -725,36 +719,21 @@ function renderEnemies(){
         oninput="G.enemies[${i}]=this.value;save();renderMatrixContent()">
       <button class="btn btn-sm btn-danger" onclick="removeEnemy(${i})">×</button>
     </div>`).join('');
-  renderExtraEnemyInputs();
-}
-function renderExtraEnemyInputs(){
-  const wrap=document.getElementById('extra-enemy-inputs');
-  if(!wrap)return;
-  wrap.innerHTML=(G.extraLists||[]).map((e,xi)=>`
-    <div class="row">
-      <input type="text" value="${e}" placeholder="z.B. Angmar..."
-        oninput="G.extraLists[${xi}]=this.value;save();renderMatrixContent()">
-      <button class="btn btn-sm btn-danger" onclick="removeExtraList(${xi})">×</button>
-    </div>`).join('');
 }
 function renderMatrixTabs(){
   const vc=getVC();if(matrixTab>=vc.length)matrixTab=0;
-  const tabsEl=document.getElementById('matrix-list-tabs');if(!tabsEl)return;
-  tabsEl.innerHTML=vc.map((c,ti)=>`
+  document.getElementById('matrix-list-tabs').innerHTML=vc.map((c,ti)=>`
     <div class="inner-tab${ti===matrixTab?' active':''}" onclick="matrixTab=${ti};renderMatrixTabs()">${c.name||'Liste '+(ti+1)}</div>`).join('');
   renderMatrixContent();
 }
 function renderMatrixContent(){
   const vc=getVC();const ve=getVE();const wrap=document.getElementById('matrix-content');
   const sc=getActiveSzenarien();
-  const extras=(G.extraLists||[]).filter(e=>e.trim());
-  if(!wrap)return;
   if(!vc.length){wrap.innerHTML='<p class="hint">Erst Listen in Phase 2.</p>';return;}
-  if(!ve.length&&!extras.length){wrap.innerHTML='<p class="hint">Erst Gegner-Listen oben eintragen.</p>';return;}
+  if(!ve.length){wrap.innerHTML='<p class="hint">Erst Gegner-Listen oben eintragen.</p>';return;}
   if(!sc.length){wrap.innerHTML='<p class="hint">Erst Szenarien in Phase 3 wählen.</p>';return;}
   if(matrixTab>=vc.length)matrixTab=0;
   const c=vc[matrixTab];const li=G.candidates.indexOf(c);
-  const listName=c.name||('Liste '+(matrixTab+1));
   let html='<div class="matrix-wrap"><table class="matrix-table"><thead><tr><th class="rh">Gegner</th>';
   sc.forEach(s=>html+=`<th style="min-width:80px">${s.length>12?s.slice(0,11)+'…':s}</th>`);
   html+='</tr></thead><tbody>';
@@ -767,278 +746,207 @@ function renderMatrixContent(){
     });
     html+='</tr>';
   });
-  if(extras.length){
-    html+=`<tr><td colspan="${sc.length+1}"><div style="border-top:2px dashed #ccc;margin:4px 0"></div></td></tr>`;
-    extras.forEach((extra,xi)=>{
-      html+=`<tr><td style="font-size:12px;padding:6px 4px;color:#888;white-space:nowrap;font-style:italic">${extra}</td>`;
-      sc.forEach((_,ci)=>{
-        const key=`${li}_${xi}_${ci}`;const val=(G.extraMatrix||{})[key]||'';
-        html+=`<td>${rSel(`exmx_${li}_${xi}_${ci}`,val,`updExtraMatrix(${li},${xi},${ci},this.value)`)}</td>`;
-      });
-      html+='</tr>';
-    });
-  }
-  html+='</tbody></table></div>';
-  html+=`<div style="display:flex;justify-content:flex-end;gap:6px;margin-top:8px">
-    <button class="btn btn-sm" onclick="exportTSV(${li},'${listName.replace(/'/g,"\'")}')">↑ TSV kopieren</button>
-    <button class="btn btn-sm" onclick="showTSVImport(${li})">↓ TSV importieren</button>
-  </div>
-  <div id="tsv-import-panel-${li}" style="display:none;margin-top:8px">
-    <div class="card" style="background:#f9f8f4">
-      <div class="label" style="margin-bottom:6px">TSV einfügen (aus Google Sheets kopieren)</div>
-      <textarea id="tsv-import-area-${li}" style="width:100%;min-height:80px;font-size:12px;font-family:var(--mono);padding:8px;background:#f5f4f0;border:1px solid #ccc;border-radius:6px" placeholder="Hier einfügen..."></textarea>
-
-```
-  <div style="display:flex;gap:6px;margin-top:8px">
-    <button class="btn btn-sm btn-primary" onclick="doTSVImport(${li})">Importieren</button>
-    <button class="btn btn-sm" onclick="document.getElementById('tsv-import-panel-${li}').style.display='none'">Abbrechen</button>
-  </div>
-  <div id="tsv-import-status-${li}"></div>
-</div>
-```
-
-  </div>`;
-  wrap.innerHTML=html;
-}
-function exportTSV(li,listName){
-  const sc=getActiveSzenarien();
-  const ve=getVE();
-  const extras=(G.extraLists||[]).filter(e=>e.trim());
-  const rl=(v)=>({kf:'!!',lf:'!','50':'0',lu:'-',ku:'--'}[v]||'');
-  let rows=[['Gegner',...sc]];
-  ve.forEach(e=>{
-    const ei=G.enemies.indexOf(e);
-    rows.push([e,...sc.map((_,ci)=>rl(G.matrix[mkey(li,ei,ci)]||''))]);
-  });
-  if(extras.length){
-    rows.push(['---',...sc.map(()=>'')]);
-    extras.forEach((extra,xi)=>{
-      rows.push([extra,...sc.map((_,ci)=>rl((G.extraMatrix||{})[`${li}_${xi}_${ci}`]||''))]);
-    });
-  }
-  const tsv=rows.map(r=>r.join('\t')).join('\n');
-  navigator.clipboard?.writeText(tsv).then(()=>alert(`TSV für "${listName}" kopiert!`))
-    .catch(()=>{const ta=document.createElement('textarea');ta.value=tsv;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);alert(`TSV für "${listName}" kopiert!`);});
-}
-function showTSVImport(li){
-  const p=document.getElementById(`tsv-import-panel-${li}`);
-  if(p)p.style.display=p.style.display==='none'?'block':'none';
-}
-function doTSVImport(li){
-  const ta=document.getElementById(`tsv-import-area-${li}`);
-  const status=document.getElementById(`tsv-import-status-${li}`);
-  if(!ta||!status)return;
-  const lines=ta.value.trim().split('\n').map(l=>l.split('\t'));
-  if(lines.length<2){status.innerHTML='<div class="box-err" style="margin-top:8px">Ungültiges Format.</div>';return;}
-  const sc=getActiveSzenarien();
-  const ve=getVE();
-  const extras=(G.extraLists||[]).filter(e=>e.trim());
-  const valMap={'!!':'kf','!':'lf','0':'50','-':'lu','--':'ku'};
-  const header=lines[0];
-  const scCols=sc.map(s=>header.findIndex(h=>h.trim()===s));
-  let merged=0;
-  lines.slice(1).forEach(row=>{
-    const name=(row[0]||'').trim();
-    if(!name||name==='---')return;
-    const ei=G.enemies.indexOf(name);
-    const xi=extras.indexOf(name);
-    scCols.forEach((col,ci)=>{
-      if(col<0||col>=row.length)return;
-      const raw=(row[col]||'').trim();
-      const val=valMap[raw]||'';
-      if(!val)return;
-      if(ei>=0){G.matrix[mkey(li,ei,ci)]=val;merged++;}
-      else if(xi>=0){if(!G.extraMatrix)G.extraMatrix={};G.extraMatrix[`${li}_${xi}_${ci}`]=val;merged++;}
-    });
-  });
-  save();
-  status.innerHTML=`<div class="box-ok" style="margin-top:8px">${merged} Bewertungen importiert ✓</div>`;
-  setTimeout(()=>{
-    document.getElementById(`tsv-import-panel-${li}`).style.display='none';
-    renderMatrixContent();
-  },1000);
+  html+='</tbody></table></div>';wrap.innerHTML=html;
 }
 
 // Portfolio
 function getCombinations(arr,k){
-if(k===0)return[[]];if(arr.length<k)return[];
-const[f,…r]=arr;
-return[…getCombinations(r,k-1).map(c=>[f,…c]),…getCombinations(r,k)];
+  if(k===0)return[[]];if(arr.length<k)return[];
+  const[f,...r]=arr;
+  return[...getCombinations(r,k-1).map(c=>[f,...c]),...getCombinations(r,k)];
 }
 function scoreCombo(combo){
-const sc=getActiveSzenarien();
-const n=sc.length||1;
-const catAvgs=sc.map((*,ci)=>{
-const avgs=combo.map(c=>avgForCand(G.candidates.indexOf(c),ci)).filter(v=>v!==null);
-if(!avgs.length)return null;
-return avgs.reduce((a,b)=>a+b,0)/avgs.length;
-}).filter(v=>v!==null);
-const overall=catAvgs.length?catAvgs.reduce((a,b)=>a+b,0)/catAvgs.length:null;
-const minC=catAvgs.length?Math.min(…catAvgs):null;
-// reliability = fraction of rated list×scenario combos with value >= 1.0
-let totalCells=0,reliableCells=0;
-combo.forEach(c=>{
-const li=G.candidates.indexOf(c);
-sc.forEach((*,ci)=>{
-const ve=getVE();
-const rated=ve.map((_,ei)=>getR(li,G.enemies.indexOf(ve[ei]),ci)).filter(v=>v!==’’);
-if(!rated.length)return;
-totalCells++;
-const avg=rated.reduce((s,v)=>s+getPts(v),0)/rated.length;
-if(avg>=1.0)reliableCells++;
-});
-});
-if(totalCells===0)return{sc,overall:null,minC:null,reliability:null,score:null};
-const reliability=reliableCells/totalCells;
-const score=reliability*0.6+(overall||1.0)*0.3+(minC||1.0)*0.1;
-return{sc,overall,minC,reliability,score};
+  const sc=getActiveSzenarien();
+  const n=sc.length||1;
+  const catAvgs=sc.map((_,ci)=>{
+    const avgs=combo.map(c=>avgForCand(G.candidates.indexOf(c),ci)).filter(v=>v!==null);
+    if(!avgs.length)return null;
+    return avgs.reduce((a,b)=>a+b,0)/avgs.length;
+  }).filter(v=>v!==null);
+  const overall=catAvgs.length?catAvgs.reduce((a,b)=>a+b,0)/catAvgs.length:null;
+  const minC=catAvgs.length?Math.min(...catAvgs):null;
+  // reliability = fraction of rated list×scenario combos with value >= 1.0
+  let totalCells=0,reliableCells=0;
+  combo.forEach(c=>{
+    const li=G.candidates.indexOf(c);
+    sc.forEach((_,ci)=>{
+      const ve=getVE();
+      const rated=ve.map((_,ei)=>getR(li,G.enemies.indexOf(ve[ei]),ci)).filter(v=>v!=='');
+      if(!rated.length)return;
+      totalCells++;
+      const avg=rated.reduce((s,v)=>s+getPts(v),0)/rated.length;
+      if(avg>=1.0)reliableCells++;
+    });
+  });
+  if(totalCells===0)return{sc,overall:null,minC:null,reliability:null,score:null};
+  const reliability=reliableCells/totalCells;
+  const score=reliability*0.6+(overall||1.0)*0.3+(minC||1.0)*0.1;
+  return{sc,overall,minC,reliability,score};
 }
 function toggleHeatmap(comboId,idxArr){
-const wrap=document.getElementById(`heatmap-${comboId}`);
-const arr=document.getElementById(`arr-${comboId}`);
-const isOpen=wrap.style.display!==‘none’;
-if(isOpen){wrap.style.display=‘none’;arr.style.transform=‘rotate(0deg)’;}
-else{
-wrap.style.display=‘block’;
-arr.style.transform=‘rotate(180deg)’;
-if(!wrap.innerHTML)wrap.innerHTML=buildHeatmap(idxArr);
-}
+  const wrap=document.getElementById(`heatmap-${comboId}`);
+  const arr=document.getElementById(`arr-${comboId}`);
+  const isOpen=wrap.style.display!=='none';
+  if(isOpen){wrap.style.display='none';arr.style.transform='rotate(0deg)';}
+  else{
+    wrap.style.display='block';
+    arr.style.transform='rotate(180deg)';
+    if(!wrap.innerHTML)wrap.innerHTML=buildHeatmap(idxArr);
+  }
 }
 
 function buildHeatmap(idxArr){
-const combo=idxArr.map(i=>G.candidates[i]).filter(Boolean);
-const sc=getActiveSzenarien();
-const ve=getVE();
-if(!ve.length||!sc.length)return’<p class="hint">Keine Daten.</p>’;
-const uid=‘hm_’+idxArr.join(’_’);
+  const combo=idxArr.map(i=>G.candidates[i]).filter(Boolean);
+  const sc=getActiveSzenarien();
+  const ve=getVE();
+  if(!ve.length||!sc.length)return'<p class="hint">Keine Daten.</p>';
+  const uid='hm_'+idxArr.join('_');
 
-const cellAvg=(ei,ci)=>{
-const vals=combo.map(c=>{
-const li=G.candidates.indexOf(c);
-const v=getR(li,G.enemies.indexOf(ve[ei]),ci);
-return v?getPts(v):null;
-}).filter(v=>v!==null);
-return vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:null;
-};
+  const cellAvg=(ei,ci)=>{
+    const vals=combo.map(c=>{
+      const li=G.candidates.indexOf(c);
+      const v=getR(li,G.enemies.indexOf(ve[ei]),ci);
+      return v?getPts(v):null;
+    }).filter(v=>v!==null);
+    return vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:null;
+  };
 
-const cellColor=(avg)=>{
-if(avg===null)return’#eeede8’;
-if(avg>=1.3)return’#7ecb6a’;
-if(avg>=1.05)return’#b8e890’;
-if(avg>=0.9)return’#e8e6e0’;
-if(avg>=0.6)return’#f0c060’;
-return’#e05050’;
-};
+  const cellColor=(avg)=>{
+    if(avg===null)return'#eeede8';
+    if(avg>=1.3)return'#7ecb6a';
+    if(avg>=1.05)return'#b8e890';
+    if(avg>=0.9)return'#e8e6e0';
+    if(avg>=0.6)return'#f0c060';
+    return'#e05050';
+  };
 
-const ratingLabel=(avg)=>{
-if(avg===null)return’nicht bewertet’;
-if(avg>=1.3)return’++’;
-if(avg>=1.05)return’+’;
-if(avg>=0.9)return’0’;
-if(avg>=0.6)return’−’;
-return’−−’;
-};
+  const ratingLabel=(avg)=>{
+    if(avg===null)return'nicht bewertet';
+    if(avg>=1.3)return'++';
+    if(avg>=1.05)return'+';
+    if(avg>=0.9)return'0';
+    if(avg>=0.6)return'−';
+    return'−−';
+  };
 
-// Build compact grid – no text in cells
-let html=`<div style="overflow-x:auto;margin-bottom:8px"> <table style="border-collapse:separate;border-spacing:2px"> <tbody>`;
+  // Build compact grid – no text in cells
+  let html=`<div style="overflow-x:auto;margin-bottom:8px">
+    <table style="border-collapse:separate;border-spacing:2px">
+      <tbody>`;
 
-ve.forEach((e,ei)=>{
-html+=`<tr>`;
-sc.forEach((_,ci)=>{
-const avg=cellAvg(ei,ci);
-const col=cellColor(avg);
-const label=ratingLabel(avg);
-html+=`<td onclick="event.stopPropagation();showHmInfo('${uid}','${sc[ci].replace(/'/g,"\\'")}','${e.replace(/'/g,"\\'")}','${label}')" style="width:18px;height:18px;min-width:18px;background:${col};border-radius:3px;cursor:pointer"></td>`;
-});
-html+=`</tr>`;
-});
+  ve.forEach((e,ei)=>{
+    html+=`<tr>`;
+    sc.forEach((_,ci)=>{
+      const avg=cellAvg(ei,ci);
+      const col=cellColor(avg);
+      const label=ratingLabel(avg);
+      html+=`<td onclick="event.stopPropagation();showHmInfo('${uid}','${sc[ci].replace(/'/g,"\\'")}','${e.replace(/'/g,"\\'")}','${label}')"
+        style="width:18px;height:18px;min-width:18px;background:${col};border-radius:3px;cursor:pointer"></td>`;
+    });
+    html+=`</tr>`;
+  });
 
-html+=`</tbody></table></div>
-
+  html+=`</tbody></table></div>
   <div id="${uid}-info" style="font-size:12px;color:#555;padding:6px 8px;background:#f5f4f0;border-radius:4px;min-height:28px;margin-bottom:8px"></div>`;
 
-// Warnings
-const warnings=[];
-sc.forEach((scName,ci)=>{
-const avgs=ve.map((*,ei)=>cellAvg(ei,ci)).filter(a=>a!==null);
-if(!avgs.length)return;
-const weakCount=avgs.filter(a=>a<0.85).length;
-if(weakCount>=Math.ceil(avgs.length*0.2))
-warnings.push(`${scName}: in ${weakCount} von ${avgs.length} Matchups schwach`);
-});
-ve.forEach((e,ei)=>{
-const avgs=sc.map((*,ci)=>cellAvg(ei,ci)).filter(a=>a!==null);
-if(!avgs.length)return;
-const weakCount=avgs.filter(a=>a<0.85).length;
-if(weakCount>=Math.ceil(avgs.length*0.2))
-warnings.push(`vs. ${e}: in ${weakCount} von ${avgs.length} Szenarien schwach`);
-});
+  // Warnings
+  const warnings=[];
+  sc.forEach((scName,ci)=>{
+    const avgs=ve.map((_,ei)=>cellAvg(ei,ci)).filter(a=>a!==null);
+    if(!avgs.length)return;
+    const weakCount=avgs.filter(a=>a<0.85).length;
+    if(weakCount>=Math.ceil(avgs.length*0.2))
+      warnings.push(`${scName}: in ${weakCount} von ${avgs.length} Matchups schwach`);
+  });
+  ve.forEach((e,ei)=>{
+    const avgs=sc.map((_,ci)=>cellAvg(ei,ci)).filter(a=>a!==null);
+    if(!avgs.length)return;
+    const weakCount=avgs.filter(a=>a<0.85).length;
+    if(weakCount>=Math.ceil(avgs.length*0.2))
+      warnings.push(`vs. ${e}: in ${weakCount} von ${avgs.length} Szenarien schwach`);
+  });
 
-if(warnings.length){
-html+=warnings.map(w=>`<div style="font-size:12px;color:#804000;background:#fff8e8;border:1px solid #e0c040;border-radius:4px;padding:6px 10px;margin-bottom:4px">⚠ ${w}</div>`).join(’’);
-} else {
-html+=`<div style="font-size:12px;color:#2a6000;background:#e8f5d8;border:1px solid #90c040;border-radius:4px;padding:6px 10px">✓ Keine kritischen Schwachstellen</div>`;
-}
-return html;
+  if(warnings.length){
+    html+=warnings.map(w=>`<div style="font-size:12px;color:#804000;background:#fff8e8;border:1px solid #e0c040;border-radius:4px;padding:6px 10px;margin-bottom:4px">⚠ ${w}</div>`).join('');
+  } else {
+    html+=`<div style="font-size:12px;color:#2a6000;background:#e8f5d8;border:1px solid #90c040;border-radius:4px;padding:6px 10px">✓ Keine kritischen Schwachstellen</div>`;
+  }
+  return html;
 }
 
 function showHmInfo(uid,scenario,enemy,label){
-const el=document.getElementById(uid+’-info’);
-if(el)el.textContent=`${scenario}  ·  ${enemy}`;
+  const el=document.getElementById(uid+'-info');
+  if(el)el.textContent=`${scenario}  ·  ${enemy}`;
 }
+
 
 function hasAnyMatrixData(){
-return Object.keys(G.matrix).length>0;
+  return Object.keys(G.matrix).length>0;
 }
 function renderPortfolio(){
-const out=document.getElementById(‘portfolio-output’);
-const vc=getVC();const ap=getAP();const sc=getActiveSzenarien();
-if(vc.length<5){out.innerHTML=’<div class="box-warn">Mind. 5 Listen in Phase 2.</div>’;return;}
-if(!sc.length){out.innerHTML=’<div class="box-warn">Erst Szenarien in Phase 3 wählen.</div>’;return;}
-if(!hasAnyMatrixData()){out.innerHTML=’<div class="box-warn">Erst Matchup-Matrix in Phase 4 befüllen.</div>’;return;}
-const allC=getCombinations(vc,5);
-const valid=allC.filter(combo=>{
-const cov=new Set(combo.flatMap(c=>c.players));
-return ap.every(({i})=>cov.has(i));
-});
-if(!valid.length){out.innerHTML=’<div class="box-err">Keine gültige Kombi – Spieler-Zuordnungen prüfen.</div>’;return;}
-const sm=document.getElementById(‘sort-mode’).value;
-let scored=valid.map(combo=>({combo,s:scoreCombo(combo)})).filter(({s})=>s.score!==null);
-if(!scored.length){out.innerHTML=’<div class="box-warn">Noch zu wenig Matchup-Daten für eine Bewertung.</div>’;return;}
-if(sm===‘portfolio’)scored.sort((a,b)=>b.s.score-a.s.score);
-else if(sm===‘avg’)scored.sort((a,b)=>b.s.overall-a.s.overall);
-else scored.sort((a,b)=>b.s.reliability-a.s.reliability);
-const topN=Math.min(10,scored.length);const best=scored[0].s.score;
-let html=`<p class="hint" style="margin:10px 0">${scored.length} gültige Kombis · Top ${topN}</p>`;
-scored.slice(0,topN).forEach(({combo,s},rank)=>{
-const idxArr=combo.map(c=>G.candidates.indexOf(c));
-const isPicked=G.selectedCombo&&idxArr.every((x,i)=>G.selectedCombo[i]===x);
-const pct=Math.round(s.score/best*100);
-const comboId=`combo-${rank}`;
-html+=`<div class="combo-card${isPicked?' picked':''}" onclick="pickCombo(${JSON.stringify(idxArr)})" style="cursor:pointer"> <div style="display:flex;justify-content:space-between;align-items:baseline"> <span style="font-size:12px;color:#888;font-family:var(--mono)">#${rank+1}</span> <span class="combo-score-num">${s.score.toFixed(2)}</span> </div> <div class="score-bar" style="margin:8px 0"><div class="score-fill" style="width:${pct}%"></div></div> <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"> ${combo.map(c=>`<span style="font-size:14px;font-weight:600;color:#1a1a1a;background:#eef7e0;border:1px solid #90c040;border-radius:6px;padding:4px 10px">${c.name}</span>`).join('')} </div> <div style="font-size:11px;color:#888;font-family:var(--mono)"> Verlässlichkeit ${s.reliability!==null?Math.round(s.reliability*100)+'%':'–'} · Ø${s.overall!==null?s.overall.toFixed(2):'–'} · Schwächstes ${s.minC!==null?s.minC.toFixed(2):'–'} </div> ${isPicked?'<div style="font-size:12px;color:#4a8c10;margin-top:8px;font-weight:600">✓ Gewählt</div>':''} <div id="heatmap-${comboId}" style="display:none;margin-top:12px"></div> <div style="text-align:center;margin-top:10px"> <button onclick="event.stopPropagation();toggleHeatmap('${comboId}',${JSON.stringify(idxArr)})" style="background:none;border:none;cursor:pointer;font-size:18px;color:#888;transition:transform .2s;padding:4px 16px" id="arr-${comboId}">▾</button> </div> </div>`;
-});
-// Legend
-html+=`<div class="card" style="margin-top:16px">
-
-<div class="card-title">Legende · Score-Berechnung</div>
-<div style="font-size:12px;color:#555;line-height:1.8;margin-bottom:12px">
-Der Score bewertet wie <strong>verlässlich</strong> eine Kombi über alle Szenarien funktioniert – nicht wie stark sie in einzelnen glänzt.
-</div>
-<div style="display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:12px;margin-bottom:12px">
-<span style="font-weight:600;color:#555">60%</span><span style="color:#555">Verlässlichkeit – Anteil Szenarien mit 0 oder besser</span>
-<span style="font-weight:600;color:#555">30%</span><span style="color:#555">Gesamtdurchschnitt aller Listen × Szenarien</span>
-<span style="font-weight:600;color:#555">10%</span><span style="color:#555">Schwächstes Szenario (Malus für −− Häufungen)</span>
-</div>
-<div class="divider"></div>
-<div class="label" style="margin-bottom:8px">Bewertungsskala</div>
-<div style="display:flex;flex-direction:column;gap:6px;font-size:12px">
-<div style="display:flex;align-items:center;gap:10px"><span class="chip chip-kf">++</span><span style="color:#555">Cool, aber nicht nötig – kleiner Bonus</span></div>
-<div style="display:flex;align-items:center;gap:10px"><span class="chip chip-lf">+</span><span style="color:#555">Ziel – klar positiv</span></div>
-<div style="display:flex;align-items:center;gap:10px"><span class="chip chip-50">0</span><span style="color:#555">Akzeptabel – neutral</span></div>
-<div style="display:flex;align-items:center;gap:10px"><span class="chip chip-lu">−</span><span style="color:#555">Tolerierbar – leichter Malus</span></div>
-<div style="display:flex;align-items:center;gap:10px"><span class="chip chip-ku">−−</span><span style="color:#555">Unerwünscht – sollte vermieden werden</span></div>
-</div>
-
+  const out=document.getElementById('portfolio-output');
+  const vc=getVC();const ap=getAP();const sc=getActiveSzenarien();
+  if(vc.length<5){out.innerHTML='<div class="box-warn">Mind. 5 Listen in Phase 2.</div>';return;}
+  if(!sc.length){out.innerHTML='<div class="box-warn">Erst Szenarien in Phase 3 wählen.</div>';return;}
+  if(!hasAnyMatrixData()){out.innerHTML='<div class="box-warn">Erst Matchup-Matrix in Phase 4 befüllen.</div>';return;}
+  const allC=getCombinations(vc,5);
+  const valid=allC.filter(combo=>{
+    const cov=new Set(combo.flatMap(c=>c.players));
+    return ap.every(({i})=>cov.has(i));
+  });
+  if(!valid.length){out.innerHTML='<div class="box-err">Keine gültige Kombi – Spieler-Zuordnungen prüfen.</div>';return;}
+  const sm=document.getElementById('sort-mode').value;
+  let scored=valid.map(combo=>({combo,s:scoreCombo(combo)})).filter(({s})=>s.score!==null);
+  if(!scored.length){out.innerHTML='<div class="box-warn">Noch zu wenig Matchup-Daten für eine Bewertung.</div>';return;}
+  if(sm==='portfolio')scored.sort((a,b)=>b.s.score-a.s.score);
+  else if(sm==='avg')scored.sort((a,b)=>b.s.overall-a.s.overall);
+  else scored.sort((a,b)=>b.s.reliability-a.s.reliability);
+  const topN=Math.min(10,scored.length);const best=scored[0].s.score;
+  let html=`<p class="hint" style="margin:10px 0">${scored.length} gültige Kombis · Top ${topN}</p>`;
+  scored.slice(0,topN).forEach(({combo,s},rank)=>{
+    const idxArr=combo.map(c=>G.candidates.indexOf(c));
+    const isPicked=G.selectedCombo&&idxArr.every((x,i)=>G.selectedCombo[i]===x);
+    const pct=Math.round(s.score/best*100);
+    const comboId=`combo-${rank}`;
+    html+=`<div class="combo-card${isPicked?' picked':''}" onclick="pickCombo(${JSON.stringify(idxArr)})" style="cursor:pointer">
+      <div style="display:flex;justify-content:space-between;align-items:baseline">
+        <span style="font-size:12px;color:#888;font-family:var(--mono)">#${rank+1}</span>
+        <span class="combo-score-num">${s.score.toFixed(2)}</span>
+      </div>
+      <div class="score-bar" style="margin:8px 0"><div class="score-fill" style="width:${pct}%"></div></div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
+        ${combo.map(c=>`<span style="font-size:14px;font-weight:600;color:#1a1a1a;background:#eef7e0;border:1px solid #90c040;border-radius:6px;padding:4px 10px">${c.name}</span>`).join('')}
+      </div>
+      <div style="font-size:11px;color:#888;font-family:var(--mono)">
+        Verlässlichkeit ${s.reliability!==null?Math.round(s.reliability*100)+'%':'–'} · Ø${s.overall!==null?s.overall.toFixed(2):'–'} · Schwächstes ${s.minC!==null?s.minC.toFixed(2):'–'}
+      </div>
+      ${isPicked?'<div style="font-size:12px;color:#4a8c10;margin-top:8px;font-weight:600">✓ Gewählt</div>':''}
+      <div id="heatmap-${comboId}" style="display:none;margin-top:12px"></div>
+      <div style="text-align:center;margin-top:10px">
+        <button onclick="event.stopPropagation();toggleHeatmap('${comboId}',${JSON.stringify(idxArr)})" style="background:none;border:none;cursor:pointer;font-size:18px;color:#888;transition:transform .2s;padding:4px 16px" id="arr-${comboId}">▾</button>
+      </div>
+    </div>`;
+  });
+  // Legend
+  html+=`<div class="card" style="margin-top:16px">
+    <div class="card-title">Legende · Score-Berechnung</div>
+    <div style="font-size:12px;color:#555;line-height:1.8;margin-bottom:12px">
+      Der Score bewertet wie <strong>verlässlich</strong> eine Kombi über alle Szenarien funktioniert – nicht wie stark sie in einzelnen glänzt.
+    </div>
+    <div style="display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:12px;margin-bottom:12px">
+      <span style="font-weight:600;color:#555">60%</span><span style="color:#555">Verlässlichkeit – Anteil Szenarien mit 0 oder besser</span>
+      <span style="font-weight:600;color:#555">30%</span><span style="color:#555">Gesamtdurchschnitt aller Listen × Szenarien</span>
+      <span style="font-weight:600;color:#555">10%</span><span style="color:#555">Schwächstes Szenario (Malus für −− Häufungen)</span>
+    </div>
+    <div class="divider"></div>
+    <div class="label" style="margin-bottom:8px">Bewertungsskala</div>
+    <div style="display:flex;flex-direction:column;gap:6px;font-size:12px">
+      <div style="display:flex;align-items:center;gap:10px"><span class="chip chip-kf">++</span><span style="color:#555">Cool, aber nicht nötig – kleiner Bonus</span></div>
+      <div style="display:flex;align-items:center;gap:10px"><span class="chip chip-lf">+</span><span style="color:#555">Ziel – klar positiv</span></div>
+      <div style="display:flex;align-items:center;gap:10px"><span class="chip chip-50">0</span><span style="color:#555">Akzeptabel – neutral</span></div>
+      <div style="display:flex;align-items:center;gap:10px"><span class="chip chip-lu">−</span><span style="color:#555">Tolerierbar – leichter Malus</span></div>
+      <div style="display:flex;align-items:center;gap:10px"><span class="chip chip-ku">−−</span><span style="color:#555">Unerwünscht – sollte vermieden werden</span></div>
+    </div>
   </div>`;
   out.innerHTML=html;
 }
@@ -1046,720 +954,823 @@ function pickCombo(idxArr){G.selectedCombo=idxArr;save();renderPortfolio();}
 
 // Tourney Teams
 function addTourneyTeam(){
-G.tourneyTeams.push({name:’’,lists:Array(5).fill(null).map(()=>({type:‘meta’,val:’’,manual:’’})),ratings:{},open:false});
-save();renderTourneyTeams();
+  G.tourneyTeams.push({name:'',lists:Array(5).fill(null).map(()=>({type:'meta',val:'',manual:''})),ratings:{},open:false});
+  save();renderTourneyTeams();
 }
 function getMetaOpts(sel){
-const metaOpts=getVE().map(e=>`<option value="meta:${e}"${sel===`meta:${e}`?' selected':''}>${e}</option>`).join(’’);
-const extraOpts=(G.extraLists||[]).filter(e=>e.trim()).map(e=>`<option value="extra:${e}"${sel===`extra:${e}`?' selected':''}>${e}</option>`).join(’’);
-const sep=extraOpts?`<option disabled>── Extra-Listen ──</option>`:’’;
-return`<option value="">– Liste wählen –</option>${metaOpts}${sep}${extraOpts}`;
+  const metaOpts=getVE().map(e=>`<option value="meta:${e}"${sel===`meta:${e}`?' selected':''}>${e}</option>`).join('');
+  const extraOpts=(G.extraLists||[]).filter(e=>e.trim()).map(e=>`<option value="extra:${e}"${sel===`extra:${e}`?' selected':''}>${e}</option>`).join('');
+  const sep=extraOpts?`<option disabled>── Extra-Listen ──</option>`:'';
+  return`<option value="">– Liste wählen –</option>${metaOpts}${sep}${extraOpts}`;
 }
 function onTTListChange(ti,li,val){
-if(val.startsWith(‘meta:’)){
-G.tourneyTeams[ti].lists[li]={type:‘meta’,val:val.slice(5),manual:’’};
-} else if(val.startsWith(‘extra:’)){
-G.tourneyTeams[ti].lists[li]={type:‘extra’,val:val.slice(6),manual:’’};
-} else {
-G.tourneyTeams[ti].lists[li]={type:‘meta’,val:’’,manual:’’};
-}
-save();renderTourneyTeams();
+  if(val.startsWith('meta:')){
+    G.tourneyTeams[ti].lists[li]={type:'meta',val:val.slice(5),manual:''};
+  } else if(val.startsWith('extra:')){
+    G.tourneyTeams[ti].lists[li]={type:'extra',val:val.slice(6),manual:''};
+  } else {
+    G.tourneyTeams[ti].lists[li]={type:'meta',val:'',manual:''};
+  }
+  save();renderTourneyTeams();
 }
 function getTTName(l){
-if(!l||typeof l===‘string’)return l||’’;
-if(l.type===‘manual’)return l.manual||’’;
-return l.val||’’;
+  if(!l||typeof l==='string')return l||'';
+  if(l.type==='manual')return l.manual||'';
+  return l.val||'';
 }
 function confirmAddExtraList(ti){
-const inp=document.getElementById(`new-extra-input-${ti}`);
-if(!inp)return;
-const name=inp.value.trim();
-if(!name)return;
-if(!G.extraLists)G.extraLists=[];
-if(!G.extraLists.includes(name))G.extraLists.push(name);
-save();renderTourneyTeams();renderExtraEnemyInputs();renderMatrixContent();
+  const inp=document.getElementById(`new-extra-input-${ti}`);
+  if(!inp)return;
+  const name=inp.value.trim();
+  if(!name)return;
+  if(!G.extraLists)G.extraLists=[];
+  if(!G.extraLists.includes(name))G.extraLists.push(name);
+  save();renderTourneyTeams();renderExtraMatrix();
 }
 function toggleTT(ti){
-G.tourneyTeams[ti].open=!G.tourneyTeams[ti].open;
-save();renderTourneyTeams();
+  G.tourneyTeams[ti].open=!G.tourneyTeams[ti].open;
+  save();renderTourneyTeams();
 }
 function renderTourneyTeams(){
-const wrap=document.getElementById(‘tourney-teams’);
-if(!G.tourneyTeams.length){wrap.innerHTML=’<p class="hint" style="margin-bottom:12px">Noch keine Teams.</p>’;return;}
-G.tourneyTeams.forEach(t=>{
-t.lists=t.lists.map(l=>typeof l===‘string’?{type:‘meta’,val:l,manual:’’}:l);
-});
-wrap.innerHTML=G.tourneyTeams.map((team,ti)=>{
-const isOpen=team.open||false;
-const lists=team.lists.map(l=>getTTName(l)).filter(l=>l.trim());
-return`<div class="combo-card" style="margin-bottom:10px"> <div style="display:flex;gap:8px;align-items:center"> <input type="text" value="${team.name}" placeholder="Teamname..." style="flex:1;font-weight:600;font-size:14px;background:none;border:none;border-bottom:1px solid #ddd;border-radius:0;padding:4px 0" oninput="G.tourneyTeams[${ti}].name=this.value;save()"> <button class="btn btn-sm btn-danger" onclick="G.tourneyTeams.splice(${ti},1);save();renderTourneyTeams()">×</button> </div> <div style="display:flex;flex-wrap:wrap;gap:4px;margin:8px 0"> ${lists.length?lists.map(l=>`<span class="tag">${l}</span>`).join(''):'<span class="hint">Noch keine Listen</span>'} </div> <div style="display:${isOpen?'block':'none'}"> <div class="divider"></div> <div class="label" style="margin-bottom:8px">5 Listen</div> ${team.lists.map((l,li)=>`
-
-<div style="margin-bottom:8px">
-<select onchange="onTTListChange(${ti},${li},this.value)">${getMetaOpts(l.type==='extra'?`extra:${l.val}`:`meta:${l.val}`)}</select>
-</div>`).join('')} <div style="display:flex;gap:6px;margin-bottom:12px;align-items:center"> <input type="text" id="new-extra-input-${ti}" placeholder="Neue Liste anlegen…" style="flex:1"> <button class="btn btn-sm btn-primary" onclick="confirmAddExtraList(${ti})">+</button> </div> <div class="divider"></div> <div class="label" style="margin-bottom:6px">Matchup-Einschätzungen</div> <div id="tt-mx-${ti}"></div> </div> <div style="text-align:center;margin-top:8px"> <button onclick="toggleTT(${ti})" style="background:none;border:none;cursor:pointer;font-size:18px;color:#888;padding:4px 16px">${isOpen?'▴':'▾'}</button> </div> </div>`;
-}).join('');
-G.tourneyTeams.forEach((*,ti)=>{if(G.tourneyTeams[ti].open)renderTTMx(ti);});
+  const wrap=document.getElementById('tourney-teams');
+  if(!G.tourneyTeams.length){wrap.innerHTML='<p class="hint" style="margin-bottom:12px">Noch keine Teams.</p>';return;}
+  G.tourneyTeams.forEach(t=>{
+    t.lists=t.lists.map(l=>typeof l==='string'?{type:'meta',val:l,manual:''}:l);
+  });
+  wrap.innerHTML=G.tourneyTeams.map((team,ti)=>{
+    const isOpen=team.open||false;
+    const lists=team.lists.map(l=>getTTName(l)).filter(l=>l.trim());
+    return`<div class="combo-card" style="margin-bottom:10px">
+      <div style="display:flex;gap:8px;align-items:center">
+        <input type="text" value="${team.name}" placeholder="Teamname..." style="flex:1;font-weight:600;font-size:14px;background:none;border:none;border-bottom:1px solid #ddd;border-radius:0;padding:4px 0"
+          oninput="G.tourneyTeams[${ti}].name=this.value;save()">
+        <button class="btn btn-sm btn-danger" onclick="G.tourneyTeams.splice(${ti},1);save();renderTourneyTeams()">×</button>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;margin:8px 0">
+        ${lists.length?lists.map(l=>`<span class="tag">${l}</span>`).join(''):'<span class="hint">Noch keine Listen</span>'}
+      </div>
+      <div style="display:${isOpen?'block':'none'}">
+        <div class="divider"></div>
+        <div class="label" style="margin-bottom:8px">5 Listen</div>
+        ${team.lists.map((l,li)=>`
+          <div style="margin-bottom:8px">
+            <select onchange="onTTListChange(${ti},${li},this.value)">${getMetaOpts(l.type==='extra'?`extra:${l.val}`:`meta:${l.val}`)}</select>
+          </div>`).join('')}
+        <div style="display:flex;gap:6px;margin-bottom:12px;align-items:center">
+          <input type="text" id="new-extra-input-${ti}" placeholder="Neue Liste anlegen…" style="flex:1">
+          <button class="btn btn-sm btn-primary" onclick="confirmAddExtraList(${ti})">+</button>
+        </div>
+        <div class="divider"></div>
+        <div class="label" style="margin-bottom:6px">Matchup-Einschätzungen</div>
+        <div id="tt-mx-${ti}"></div>
+      </div>
+      <div style="text-align:center;margin-top:8px">
+        <button onclick="toggleTT(${ti})" style="background:none;border:none;cursor:pointer;font-size:18px;color:#888;padding:4px 16px">${isOpen?'▴':'▾'}</button>
+      </div>
+    </div>`;
+  }).join('');
+  G.tourneyTeams.forEach((_,ti)=>{if(G.tourneyTeams[ti].open)renderTTMx(ti);});
 }
 function renderTTMx(ti){
-const wrap=document.getElementById(`tt-mx-${ti}`);if(!wrap)return;
-const team=G.tourneyTeams[ti];
-const validOpp=team.lists.map(l=>getTTName(l)).filter(l=>l.trim());
-if(!validOpp.length||!G.selectedCombo){wrap.innerHTML='<p class="hint">Erst finale 5 in Phase 4 wählen.</p>';return;}
-const myLists=G.selectedCombo.map(i=>G.candidates[i]).filter(Boolean);
-const sc=getActiveSzenarien();
-if(!sc.length){wrap.innerHTML='<p class="hint">Erst Szenarien in Phase 3 wählen.</p>';return;}
-let html='<div class="matrix-wrap"><table class="matrix-table"><thead><tr><th class="rh">Unsere Liste</th>';
-sc.forEach(s=>html+=`<th style="min-width:60px">${s.length>8?s.slice(0,7)+'…':s}</th>`);
-html+='</tr></thead><tbody>';
-myLists.forEach((myC,mli)=>{
-const li=G.candidates.indexOf(myC);
-validOpp.forEach((tl,tli)=>{
-const ei=G.enemies.indexOf(tl);const known=ei>=0;
-html+=`<tr><td style="font-size:10px;color:#555;padding:4px;line-height:1.3"> <span style="color:#1a1a1a">${myC.name}</span><br>vs ${tl} </td>`;
-sc.forEach((*,ci)=>{
-const isExtra=G.extraLists&&G.extraLists.includes(tl);
-if(known){
-const v=getR(li,ei,ci);
-const key=`${li}_${ei}_${ci}`;
-html+=`<td>${rSel(`ttmeta_${ti}*${mli}*${ei}*${ci}`,v,`G.matrix['${key}']=this.value;save()`)}</td>`;
-} else if(isExtra){
-const xi=(G.extraLists||[]).indexOf(tl);
-if(!G.extraMatrix)G.extraMatrix={};
-const key=`${li}_${xi}_${ci}`;
-const v=G.extraMatrix[key]||'';
-html+=`<td>${rSel(`ttex*${ti}*${mli}*${xi}*${ci}`,v,`updExtraMatrix(${li},${xi},${ci},this.value)`)}</td>`;
-} else {
-if(!team.ratings)team.ratings={};
-if(!team.ratings[myC.name])team.ratings[myC.name]={};
-if(!team.ratings[myC.name][tl])team.ratings[myC.name][tl]=Array(sc.length).fill('');
-const v=team.ratings[myC.name][tl][ci]||'';
-html+=`<td>${rSel(`tt*${ti}*${mli}*${tli}*${ci}`,v,`updTTR(${ti},'${myC.name}','${tl}',${ci},this.value)`)}</td>`;
-}
-});
-html+='</tr>';
-});
-});
-html+='</tbody></table></div>';wrap.innerHTML=html;
+  const wrap=document.getElementById(`tt-mx-${ti}`);if(!wrap)return;
+  const team=G.tourneyTeams[ti];
+  const validOpp=team.lists.map(l=>getTTName(l)).filter(l=>l.trim());
+  if(!validOpp.length||!G.selectedCombo){wrap.innerHTML='<p class="hint">Erst finale 5 in Phase 4 wählen.</p>';return;}
+  const myLists=G.selectedCombo.map(i=>G.candidates[i]).filter(Boolean);
+  const sc=getActiveSzenarien();
+  if(!sc.length){wrap.innerHTML='<p class="hint">Erst Szenarien in Phase 3 wählen.</p>';return;}
+  let html='<div class="matrix-wrap"><table class="matrix-table"><thead><tr><th class="rh">Unsere Liste</th>';
+  sc.forEach(s=>html+=`<th style="min-width:60px">${s.length>8?s.slice(0,7)+'…':s}</th>`);
+  html+='</tr></thead><tbody>';
+  myLists.forEach((myC,mli)=>{
+    const li=G.candidates.indexOf(myC);
+    validOpp.forEach((tl,tli)=>{
+      const ei=G.enemies.indexOf(tl);const known=ei>=0;
+      html+=`<tr><td style="font-size:10px;color:#555;padding:4px;line-height:1.3">
+        <span style="color:#1a1a1a">${myC.name}</span><br>vs ${tl}
+      </td>`;
+      sc.forEach((_,ci)=>{
+        const isExtra=G.extraLists&&G.extraLists.includes(tl);
+        if(known){
+          const v=getR(li,ei,ci);
+          const key=`${li}_${ei}_${ci}`;
+          html+=`<td>${rSel(`ttmeta_${ti}_${mli}_${ei}_${ci}`,v,`G.matrix['${key}']=this.value;save()`)}</td>`;
+        } else if(isExtra){
+          const xi=(G.extraLists||[]).indexOf(tl);
+          if(!G.extraMatrix)G.extraMatrix={};
+          const key=`${li}_${xi}_${ci}`;
+          const v=G.extraMatrix[key]||'';
+          html+=`<td>${rSel(`ttex_${ti}_${mli}_${xi}_${ci}`,v,`updExtraMatrix(${li},${xi},${ci},this.value)`)}</td>`;
+        } else {
+          if(!team.ratings)team.ratings={};
+          if(!team.ratings[myC.name])team.ratings[myC.name]={};
+          if(!team.ratings[myC.name][tl])team.ratings[myC.name][tl]=Array(sc.length).fill('');
+          const v=team.ratings[myC.name][tl][ci]||'';
+          html+=`<td>${rSel(`tt_${ti}_${mli}_${tli}_${ci}`,v,`updTTR(${ti},'${myC.name}','${tl}',${ci},this.value)`)}</td>`;
+        }
+      });
+      html+='</tr>';
+    });
+  });
+  html+='</tbody></table></div>';wrap.innerHTML=html;
 }
 function updTTR(ti,ml,el,ci,val){
-// check if el is a meta enemy
-const ei=G.enemies.indexOf(el);
-if(ei>=0){G.matrix[mkey(G.candidates.findIndex(c=>c.name===ml),ei,ci)]=val;save();return;}
-// check if extra list
-const xi=(G.extraLists||[]).indexOf(el);
-const li=G.candidates.findIndex(c=>c.name===ml);
-if(xi>=0&&li>=0){if(!G.extraMatrix)G.extraMatrix={};G.extraMatrix[`${li}_${xi}_${ci}`]=val;save();return;}
-// fallback to team ratings
-if(!G.tourneyTeams[ti].ratings)G.tourneyTeams[ti].ratings={};
-if(!G.tourneyTeams[ti].ratings[ml])G.tourneyTeams[ti].ratings[ml]={};
-const sc=getActiveSzenarien();
-if(!G.tourneyTeams[ti].ratings[ml][el])G.tourneyTeams[ti].ratings[ml][el]=Array(sc.length).fill('');
-G.tourneyTeams[ti].ratings[ml][el][ci]=val;
-save();
+  // check if el is a meta enemy
+  const ei=G.enemies.indexOf(el);
+  if(ei>=0){G.matrix[mkey(G.candidates.findIndex(c=>c.name===ml),ei,ci)]=val;save();return;}
+  // check if extra list
+  const xi=(G.extraLists||[]).indexOf(el);
+  const li=G.candidates.findIndex(c=>c.name===ml);
+  if(xi>=0&&li>=0){if(!G.extraMatrix)G.extraMatrix={};G.extraMatrix[`${li}_${xi}_${ci}`]=val;save();return;}
+  // fallback to team ratings
+  if(!G.tourneyTeams[ti].ratings)G.tourneyTeams[ti].ratings={};
+  if(!G.tourneyTeams[ti].ratings[ml])G.tourneyTeams[ti].ratings[ml]={};
+  const sc=getActiveSzenarien();
+  if(!G.tourneyTeams[ti].ratings[ml][el])G.tourneyTeams[ti].ratings[ml][el]=Array(sc.length).fill('');
+  G.tourneyTeams[ti].ratings[ml][el][ci]=val;
+  save();
 }
 function updExtraMatrix(li,xi,ci,val){
-if(!G.extraMatrix)G.extraMatrix={};
-G.extraMatrix[`${li}_${xi}_${ci}`]=val;
-save(); // just save, don't re-render
+  if(!G.extraMatrix)G.extraMatrix={};
+  G.extraMatrix[`${li}_${xi}_${ci}`]=val;
+  save(); // just save, don't re-render
 }
 let extraMatrixTab=0;
 function renderExtraMatrix(){
-const wrap=document.getElementById('extra-matrix-wrap');
-if(!wrap)return;
-const extraLists=(G.extraLists||[]).filter(e=>e.trim());
-const sc=getActiveSzenarien();
-const vc=getVC();
-if(!extraLists.length){
-wrap.innerHTML='<p class="hint">Noch keine Extra-Listen. Beim Anlegen in Turnier-Teams automatisch gespeichert.</p>';return;
-}
-if(!vc.length||!sc.length){wrap.innerHTML='<p class="hint">Erst Listen und Szenarien definieren.</p>';return;}
-const myLists=G.selectedCombo?G.selectedCombo.map(i=>G.candidates[i]).filter(Boolean):vc;
-if(extraMatrixTab>=myLists.length)extraMatrixTab=0;
-let html='<div class="inner-tabs">';
-myLists.forEach((c,ti)=>html+=`<div class="inner-tab${ti===extraMatrixTab?' active':''}" onclick="extraMatrixTab=${ti};renderExtraMatrix()">${c.name}</div>`);
-html+='</div>';
-const myC=myLists[extraMatrixTab];
-const li=G.candidates.indexOf(myC);
-html+='<div class="matrix-wrap"><table class="matrix-table"><thead><tr><th class="rh">Extra-Liste</th>';
-sc.forEach(s=>html+=`<th style="min-width:80px">${s.length>8?s.slice(0,7)+'…':s}</th>`);
-html+='</tr></thead><tbody>';
-extraLists.forEach((extra,xi)=>{
-html+=`<tr><td style="font-size:12px;padding:6px 4px;color:#555;white-space:nowrap"> <div style="display:flex;align-items:center;gap:4px"> ${extra} <button onclick="removeExtraList(${xi})" style="background:none;border:none;color:#ccc;cursor:pointer;font-size:11px;flex-shrink:0">×</button> </div> </td>`;
-sc.forEach((*,ci)=>{
-const key=`${li}_${xi}_${ci}`;
-const val=(G.extraMatrix||{})[key]||'';
-html+=`<td>${rSel(`exmx_${li}*${xi}*${ci}`,val,`updExtraMatrix(${li},${xi},${ci},this.value)`)}</td>`;
-});
-html+='</tr>';
-});
-html+='</tbody></table></div>';
-wrap.innerHTML=html;
+  const wrap=document.getElementById('extra-matrix-wrap');
+  if(!wrap)return;
+  const extraLists=(G.extraLists||[]).filter(e=>e.trim());
+  const sc=getActiveSzenarien();
+  const vc=getVC();
+  if(!extraLists.length){
+    wrap.innerHTML='<p class="hint">Noch keine Extra-Listen. Beim Anlegen in Turnier-Teams automatisch gespeichert.</p>';return;
+  }
+  if(!vc.length||!sc.length){wrap.innerHTML='<p class="hint">Erst Listen und Szenarien definieren.</p>';return;}
+  const myLists=G.selectedCombo?G.selectedCombo.map(i=>G.candidates[i]).filter(Boolean):vc;
+  if(extraMatrixTab>=myLists.length)extraMatrixTab=0;
+  let html='<div class="inner-tabs">';
+  myLists.forEach((c,ti)=>html+=`<div class="inner-tab${ti===extraMatrixTab?' active':''}" onclick="extraMatrixTab=${ti};renderExtraMatrix()">${c.name}</div>`);
+  html+='</div>';
+  const myC=myLists[extraMatrixTab];
+  const li=G.candidates.indexOf(myC);
+  html+='<div class="matrix-wrap"><table class="matrix-table"><thead><tr><th class="rh">Extra-Liste</th>';
+  sc.forEach(s=>html+=`<th style="min-width:80px">${s.length>8?s.slice(0,7)+'…':s}</th>`);
+  html+='</tr></thead><tbody>';
+  extraLists.forEach((extra,xi)=>{
+    html+=`<tr><td style="font-size:12px;padding:6px 4px;color:#555;white-space:nowrap">
+      <div style="display:flex;align-items:center;gap:4px">
+        ${extra}
+        <button onclick="removeExtraList(${xi})" style="background:none;border:none;color:#ccc;cursor:pointer;font-size:11px;flex-shrink:0">×</button>
+      </div>
+    </td>`;
+    sc.forEach((_,ci)=>{
+      const key=`${li}_${xi}_${ci}`;
+      const val=(G.extraMatrix||{})[key]||'';
+      html+=`<td>${rSel(`exmx_${li}_${xi}_${ci}`,val,`updExtraMatrix(${li},${xi},${ci},this.value)`)}</td>`;
+    });
+    html+='</tr>';
+  });
+  html+='</tbody></table></div>';
+  wrap.innerHTML=html;
 }
 function removeExtraList(xi){
-const name=G.extraLists[xi];
-// clean extraMatrix
-const newMatrix={};
-Object.keys(G.extraMatrix||{}).forEach(key=>{
-const parts=key.split('_');
-const li=parseInt(parts[0]),eiN=parseInt(parts[1]),ci=parseInt(parts[2]);
-if(eiN===xi)return;
-if(eiN>xi)newMatrix[`${li}_${eiN-1}_${ci}`]=G.extraMatrix[key];
-else newMatrix[key]=G.extraMatrix[key];
-});
-G.extraMatrix=newMatrix;
-// clean team entries pointing to this extra list
-G.tourneyTeams.forEach(team=>{
-team.lists=team.lists.map(l=>
-l.type==='extra'&&l.val===name?{type:'meta',val:'',manual:''}:l
-);
-});
-G.extraLists.splice(xi,1);
-save();renderExtraEnemyInputs();renderMatrixContent();renderTourneyTeams();
+  const name=G.extraLists[xi];
+  // clean extraMatrix
+  const newMatrix={};
+  Object.keys(G.extraMatrix||{}).forEach(key=>{
+    const parts=key.split('_');
+    const li=parseInt(parts[0]),eiN=parseInt(parts[1]),ci=parseInt(parts[2]);
+    if(eiN===xi)return;
+    if(eiN>xi)newMatrix[`${li}_${eiN-1}_${ci}`]=G.extraMatrix[key];
+    else newMatrix[key]=G.extraMatrix[key];
+  });
+  G.extraMatrix=newMatrix;
+  // clean team entries pointing to this extra list
+  G.tourneyTeams.forEach(team=>{
+    team.lists=team.lists.map(l=>
+      l.type==='extra'&&l.val===name?{type:'meta',val:'',manual:''}:l
+    );
+  });
+  G.extraLists.splice(xi,1);
+  save();renderExtraMatrix();renderTourneyTeams();
 }
 
 // ══════════════════════════════════════════════════════════════════
 // TURNIER
 // ══════════════════════════════════════════════════════════════════
 function showView(id){
-document.querySelectorAll(’#panel-turnier .view’).forEach(v=>v.classList.remove(‘active’));
-document.getElementById(‘view-’+id).classList.add(‘active’);
-const views=[‘runde’,‘strike’,‘attack’,‘defend’,‘decision’,‘results’];
-document.querySelectorAll(’#turnier-subtabs .stab’).forEach((t,i)=>
-t.classList.toggle(‘active’,views[i]===id));
-currentViewId=id;
-if(id===‘runde’){
-renderTeamSelect();
-const r=R();
-const sc=getActiveSzenarien();
-const catEl=document.getElementById(‘round-cat’);
-if(catEl){
-catEl.innerHTML=’<option value="">– wählen –</option>’+sc.map(s=>`<option value="${s}"${r.scenario===s?' selected':''}>${s}</option>`).join(’’);
-}
-document.getElementById(‘opp-name’).value=r.oppName||’’;
-renderStrike();
-}
-if(id===‘strike’)renderStrike();
-if(id===‘attack’)renderAttack();
-if(id===‘defend’)renderDefend();
-if(id===‘decision’)renderDecisionSelects();
-if(id===‘results’)renderResults();
-window.scrollTo(0,0);
+  document.querySelectorAll('#panel-turnier .view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('view-'+id).classList.add('active');
+  const views=['runde','strike','attack','defend','decision','results'];
+  document.querySelectorAll('#turnier-subtabs .stab').forEach((t,i)=>
+    t.classList.toggle('active',views[i]===id));
+  currentViewId=id;
+  if(id==='runde'){
+    renderTeamSelect();
+    const r=R();
+    const sc=getActiveSzenarien();
+    const catEl=document.getElementById('round-cat');
+    if(catEl){
+      catEl.innerHTML='<option value="">– wählen –</option>'+sc.map(s=>`<option value="${s}"${r.scenario===s?' selected':''}>${s}</option>`).join('');
+    }
+    document.getElementById('opp-name').value=r.oppName||'';
+    renderStrike();
+  }
+  if(id==='strike')renderStrike();
+  if(id==='attack')renderAttack();
+  if(id==='defend')renderDefend();
+  if(id==='decision')renderDecisionSelects();
+  if(id==='results')renderResults();
+  window.scrollTo(0,0);
 }
 
 // Round
 function updateRoundBadge(){
-const rb=document.getElementById(‘round-badge’);
-rb.style.display=‘block’;
-rb.textContent=‘R’+(G.currentRound+1)+’ ▾’;
-document.querySelectorAll(’#round-dd .rdrop-item’).forEach((el,i)=>{
-el.classList.toggle(‘cur’,i===G.currentRound);
-el.classList.toggle(‘done’,G.rounds[i].matchups.some(m=>m.myPts!==null)&&i!==G.currentRound);
-});
+  const rb=document.getElementById('round-badge');
+  rb.style.display='block';
+  rb.textContent='R'+(G.currentRound+1)+' ▾';
+  document.querySelectorAll('#round-dd .rdrop-item').forEach((el,i)=>{
+    el.classList.toggle('cur',i===G.currentRound);
+    el.classList.toggle('done',G.rounds[i].matchups.some(m=>m.myPts!==null)&&i!==G.currentRound);
+  });
 }
 function setRound(i){
-G.currentRound=i;save();
-document.getElementById(‘round-dd’).classList.remove(‘open’);
-updateRoundBadge();
-const r=R();
-const sc=getActiveSzenarien();
-const catEl=document.getElementById(‘round-cat’);
-if(catEl){
-catEl.innerHTML=’<option value="">– wählen –</option>’+sc.map(s=>`<option value="${s}"${r.scenario===s?' selected':''}>${s}</option>`).join(’’);
-}
-const oppEl=document.getElementById(‘opp-name’);if(oppEl)oppEl.value=r.oppName||’’;
-renderStrike();renderAttack();renderDefend();renderDecisionSelects();renderResults();
+  G.currentRound=i;save();
+  document.getElementById('round-dd').classList.remove('open');
+  updateRoundBadge();
+  const r=R();
+  const sc=getActiveSzenarien();
+  const catEl=document.getElementById('round-cat');
+  if(catEl){
+    catEl.innerHTML='<option value="">– wählen –</option>'+sc.map(s=>`<option value="${s}"${r.scenario===s?' selected':''}>${s}</option>`).join('');
+  }
+  const oppEl=document.getElementById('opp-name');if(oppEl)oppEl.value=r.oppName||'';
+  renderStrike();renderAttack();renderDefend();renderDecisionSelects();renderResults();
 }
 
 function renderTeamSelect(){
-const sel=document.getElementById(‘team-select’);if(!sel)return;
-const r=R();
-sel.innerHTML=’<option value="">– manuell –</option>’+
-G.tourneyTeams.filter(t=>t.name.trim()).map((t,i)=>`<option value="${i}"${r.teamIdx===i?' selected':''}>${t.name}</option>`).join(’’);
+  const sel=document.getElementById('team-select');if(!sel)return;
+  const r=R();
+  sel.innerHTML='<option value="">– manuell –</option>'+
+    G.tourneyTeams.filter(t=>t.name.trim()).map((t,i)=>`<option value="${i}"${r.teamIdx===i?' selected':''}>${t.name}</option>`).join('');
 }
 function getOppLists(){
-const r=R();
-if(r.teamIdx>=0&&G.tourneyTeams[r.teamIdx]){
-return G.tourneyTeams[r.teamIdx].lists.map(l=>getTTName(l)).filter(l=>l.trim()).concat([’’,’’,’’,’’,’’]).slice(0,5);
-}
-return r.oppLists||[’’,’’,’’,’’,’’];
+  const r=R();
+  if(r.teamIdx>=0&&G.tourneyTeams[r.teamIdx]){
+    return G.tourneyTeams[r.teamIdx].lists.map(l=>getTTName(l)).filter(l=>l.trim()).concat(['','','','','']).slice(0,5);
+  }
+  return r.oppLists||['','','','',''];
 }
 
 function selectTeam(val){
-if(val===’’)return;
-const ti=parseInt(val);
-const team=G.tourneyTeams[ti];if(!team)return;
-const r=R();
-r.teamIdx=ti;
-r.oppName=team.name;
-document.getElementById(‘opp-name’).value=team.name;
-save();renderStrike();
+  if(val==='')return;
+  const ti=parseInt(val);
+  const team=G.tourneyTeams[ti];if(!team)return;
+  const r=R();
+  r.teamIdx=ti;
+  r.oppName=team.name;
+  document.getElementById('opp-name').value=team.name;
+  save();renderStrike();
 }
 
 function renderMyListSelects(){
-const opts=’<option value="">– wählen –</option>’+G.candidates.filter(c=>c.name.trim()).map((c,i)=>{
-const realIdx=G.candidates.indexOf(c);
-return`<option value="${realIdx}">${c.name}</option>`;
-}).join(’’);
-// Use selectedCombo list names for turnier
-const myLists=G.selectedCombo?G.selectedCombo.map(i=>G.candidates[i]).filter(Boolean):[];
-const listOpts=’<option value="">– wählen –</option>’+myLists.map((c,i)=>`<option value="${i}">${c.name}</option>`).join(’’);
-[‘d-attacker’,‘d-pool’].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML=listOpts;});
-const msSel=document.getElementById(‘my-strike-sel’);
-if(msSel)msSel.innerHTML=’<option value="">– wählen –</option>’+myLists.map((c,i)=>`<option value="${i}">${c.name}</option>`).join(’’);
+  const opts='<option value="">– wählen –</option>'+G.candidates.filter(c=>c.name.trim()).map((c,i)=>{
+    const realIdx=G.candidates.indexOf(c);
+    return`<option value="${realIdx}">${c.name}</option>`;
+  }).join('');
+  // Use selectedCombo list names for turnier
+  const myLists=G.selectedCombo?G.selectedCombo.map(i=>G.candidates[i]).filter(Boolean):[];
+  const listOpts='<option value="">– wählen –</option>'+myLists.map((c,i)=>`<option value="${i}">${c.name}</option>`).join('');
+  ['d-attacker','d-pool'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML=listOpts;});
+  const msSel=document.getElementById('my-strike-sel');
+  if(msSel)msSel.innerHTML='<option value="">– wählen –</option>'+myLists.map((c,i)=>`<option value="${i}">${c.name}</option>`).join('');
 }
 
 function confirmAddOppExtraList(){
-const inp=document.getElementById(‘new-opp-extra-input’);
-if(!inp)return;
-const name=inp.value.trim();
-if(!name)return;
-if(!G.extraLists)G.extraLists=[];
-if(!G.extraLists.includes(name))G.extraLists.push(name);
-save();renderStrike();renderExtraEnemyInputs();renderMatrixContent();
+  const inp=document.getElementById('new-opp-extra-input');
+  if(!inp)return;
+  const name=inp.value.trim();
+  if(!name)return;
+  if(!G.extraLists)G.extraLists=[];
+  if(!G.extraLists.includes(name))G.extraLists.push(name);
+  save();renderStrike();renderExtraMatrix();
 }
 
 function renderStrikeHeatmap(){
-const r=R();
-const sc=getActiveSzenarien();
-const ci=sc.indexOf(r.scenario||’’);
-const myLists=G.selectedCombo?G.selectedCombo.map(i=>G.candidates[i]).filter(Boolean):[];
-const oppLists=getOppLists().filter(l=>l.trim());
-const wrap=document.getElementById(‘strike-heatmap’);
-if(!wrap)return;
-if(!myLists.length||!oppLists.length||ci<0){wrap.innerHTML=’<p class="hint" style="margin-top:10px">Erst Szenario und Gegner-Listen eintragen.</p>’;return;}
+  const r=R();
+  const sc=getActiveSzenarien();
+  const ci=sc.indexOf(r.scenario||'');
+  const myLists=G.selectedCombo?G.selectedCombo.map(i=>G.candidates[i]).filter(Boolean):[];
+  const oppLists=getOppLists().filter(l=>l.trim());
+  const wrap=document.getElementById('strike-heatmap');
+  if(!wrap)return;
+  if(!myLists.length||!oppLists.length||ci<0){wrap.innerHTML='<p class="hint" style="margin-top:10px">Erst Szenario und Gegner-Listen eintragen.</p>';return;}
 
-const myStruck=r.myStruck!==’’?parseInt(r.myStruck):-1;
-const oppStruck=r.oppStruck||’’;
+  const myStruck=r.myStruck!==''?parseInt(r.myStruck):-1;
+  const oppStruck=r.oppStruck||'';
 
-const hasMyStruck=myStruck>=0;
-const hasOppStruck=oppStruck!==’’;
+  const hasMyStruck=myStruck>=0;
+  const hasOppStruck=oppStruck!=='';
 
-const fadedMyIdx=hasMyStruck?myStruck:-1;
-const fadedOppName=hasOppStruck?oppStruck:’’;
+  const fadedMyIdx=hasMyStruck?myStruck:-1;
+  const fadedOppName=hasOppStruck?oppStruck:'';
 
-// Color helpers
-const cellColor=(val,faded)=>{
-const colors={kf:’#7ecb6a’,lf:’#b8e890’,‘50’:’#e8e6e0’,lu:’#f0c060’,ku:’#e05050’,’’:`#eeede8`};
-const fadedColors={kf:’#d4f0c8’,lf:’#e4f5d0’,‘50’:’#f5f4f0’,lu:’#f8e8b8’,ku:’#f5c0c0’,’’:`#f5f4f0`};
-return faded?(fadedColors[val]||’#f5f4f0’):(colors[val]||’#eeede8’);
-};
+  // Color helpers
+  const cellColor=(val,faded)=>{
+    const colors={kf:'#7ecb6a',lf:'#b8e890','50':'#e8e6e0',lu:'#f0c060',ku:'#e05050','':`#eeede8`};
+    const fadedColors={kf:'#d4f0c8',lf:'#e4f5d0','50':'#f5f4f0',lu:'#f8e8b8',ku:'#f5c0c0','':`#f5f4f0`};
+    return faded?(fadedColors[val]||'#f5f4f0'):(colors[val]||'#eeede8');
+  };
 
-const uid=‘shm_’+G.currentRound;
-let html=`<div style="margin-top:14px"> <div style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px">Matchup-Übersicht · ${r.scenario||'kein Szenario'}</div> <div style="overflow-x:auto"> <table style="border-collapse:separate;border-spacing:3px"> <thead><tr><th style="width:80px"></th>`;
+  const uid='shm_'+G.currentRound;
+  let html=`<div style="margin-top:14px">
+    <div style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px">Matchup-Übersicht · ${r.scenario||'kein Szenario'}</div>
+    <div style="overflow-x:auto">
+    <table style="border-collapse:separate;border-spacing:3px">
+      <thead><tr><th style="width:80px"></th>`;
 
-oppLists.forEach(opp=>{
-const faded=opp===fadedOppName;
-html+=`<th style="font-size:10px;color:${faded?'#bbb':'#555'};font-weight:${faded?'400':'600'};padding:0 2px 4px;text-align:center;max-width:60px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${opp}">${opp.length>8?opp.slice(0,7)+'…':opp}</th>`;
-});
-html+=`</tr></thead><tbody>`;
+  oppLists.forEach(opp=>{
+    const faded=opp===fadedOppName;
+    html+=`<th style="font-size:10px;color:${faded?'#bbb':'#555'};font-weight:${faded?'400':'600'};padding:0 2px 4px;text-align:center;max-width:60px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${opp}">${opp.length>8?opp.slice(0,7)+'…':opp}</th>`;
+  });
+  html+=`</tr></thead><tbody>`;
 
-myLists.forEach((c,i)=>{
-const fadedRow=i===fadedMyIdx;
-const realLi=G.selectedCombo[i];
-html+=`<tr><td style="font-size:10px;color:${fadedRow?'#bbb':'#555'};font-weight:${fadedRow?'400':'600'};padding:2px 4px 2px 0;white-space:nowrap">${c.name.length>10?c.name.slice(0,9)+'…':c.name}</td>`;
-oppLists.forEach(opp=>{
-const fadedCol=opp===fadedOppName;
-const faded=fadedRow||fadedCol;
-const ei=G.enemies.indexOf(opp);
-const xi=(G.extraLists||[]).indexOf(opp);
-let val=’’;
-if(ei>=0)val=getR(realLi,ei,ci)||’’;
-else if(xi>=0)val=(G.extraMatrix||{})[`${realLi}_${xi}_${ci}`]||’’;
-const col=cellColor(val,faded);
-const label=val?RATINGS.find(x=>x.val===val)?.label||’·’:’·’;
-html+=`<td onclick="showStrikeHmInfo('${uid}','${c.name.replace(/'/g,"\\'")}','${opp.replace(/'/g,"\\'")}','${label}')" style="width:22px;height:22px;min-width:22px;background:${col};border-radius:3px;cursor:pointer;opacity:${faded?0.6:1}"></td>`;
-});
-html+=`</tr>`;
-});
+  myLists.forEach((c,i)=>{
+    const fadedRow=i===fadedMyIdx;
+    const realLi=G.selectedCombo[i];
+    html+=`<tr><td style="font-size:10px;color:${fadedRow?'#bbb':'#555'};font-weight:${fadedRow?'400':'600'};padding:2px 4px 2px 0;white-space:nowrap">${c.name.length>10?c.name.slice(0,9)+'…':c.name}</td>`;
+    oppLists.forEach(opp=>{
+      const fadedCol=opp===fadedOppName;
+      const faded=fadedRow||fadedCol;
+      const ei=G.enemies.indexOf(opp);
+      const xi=(G.extraLists||[]).indexOf(opp);
+      let val='';
+      if(ei>=0)val=getR(realLi,ei,ci)||'';
+      else if(xi>=0)val=(G.extraMatrix||{})[`${realLi}_${xi}_${ci}`]||'';
+      const col=cellColor(val,faded);
+      const label=val?RATINGS.find(x=>x.val===val)?.label||'·':'·';
+      html+=`<td onclick="showStrikeHmInfo('${uid}','${c.name.replace(/'/g,"\\'")}','${opp.replace(/'/g,"\\'")}','${label}')"
+        style="width:22px;height:22px;min-width:22px;background:${col};border-radius:3px;cursor:pointer;opacity:${faded?0.6:1}"></td>`;
+    });
+    html+=`</tr>`;
+  });
 
-html+=`</tbody></table></div>
-
+  html+=`</tbody></table></div>
   <div id="${uid}-info" style="font-size:12px;color:#555;padding:6px 8px;background:#f5f4f0;border-radius:4px;min-height:26px;margin-top:6px"></div>
   <div style="font-size:11px;color:#aaa;margin-top:4px">${hasMyStruck||hasOppStruck?'Gestrichene Listen abgeblendet':''}</div>
   </div>`;
 
-wrap.innerHTML=html;
+  wrap.innerHTML=html;
 }
 
 function showStrikeHmInfo(uid,myList,oppList,label){
-const el=document.getElementById(uid+’-info’);
-if(el)el.textContent=`${myList}  vs  ${oppList}  ·  ${label}`;
+  const el=document.getElementById(uid+'-info');
+  if(el)el.textContent=`${myList}  vs  ${oppList}  ·  ${label}`;
 }
 
 // Strike
 function renderStrike(){
-if(!G.selectedCombo)return;
-const r=R();
-const sc=getActiveSzenarien();
-const ci=sc.indexOf(r.scenario||’’);
-const myLists=G.selectedCombo.map(i=>G.candidates[i]).filter(Boolean);
-const hasTeam=r.teamIdx>=0&&G.tourneyTeams[r.teamIdx];
+  if(!G.selectedCombo)return;
+  const r=R();
+  const sc=getActiveSzenarien();
+  const ci=sc.indexOf(r.scenario||'');
+  const myLists=G.selectedCombo.map(i=>G.candidates[i]).filter(Boolean);
+  const hasTeam=r.teamIdx>=0&&G.tourneyTeams[r.teamIdx];
 
-// Opp lists
-const oppListOpts=(sel)=>’<option value="">– Liste wählen –</option>’+
-getVE().map(e=>`<option value="${e}"${sel===e?' selected':''}>${e}</option>`).join(’’)+
-((G.extraLists||[]).filter(e=>e.trim()).length?’<option disabled>── Extra-Listen ──</option>’:’’)+
-(G.extraLists||[]).filter(e=>e.trim()).map(e=>`<option value="${e}"${sel===e?' selected':''}>${e}</option>`).join(’’);
+  // Opp lists
+  const oppListOpts=(sel)=>'<option value="">– Liste wählen –</option>'+
+    getVE().map(e=>`<option value="${e}"${sel===e?' selected':''}>${e}</option>`).join('')+
+    ((G.extraLists||[]).filter(e=>e.trim()).length?'<option disabled>── Extra-Listen ──</option>':'')+
+    (G.extraLists||[]).filter(e=>e.trim()).map(e=>`<option value="${e}"${sel===e?' selected':''}>${e}</option>`).join('');
 
-if(hasTeam){
-const team=G.tourneyTeams[r.teamIdx];
-document.getElementById(‘opp-lists-input’).innerHTML=
-team.lists.map((l,i)=>` <div class="row"> <select onchange="G.tourneyTeams[${r.teamIdx}].lists[${i}]={type:this.value.startsWith('extra:')?'extra':'meta',val:this.value.startsWith('extra:')?this.value.slice(6):this.value,manual:''};save();renderStrike();updateOppStrikeOpts();renderDecisionSelects()"> ${oppListOpts(l.type==='extra'?`extra:${l.val}`:l.val)} </select> </div>`).join(’’)+
-`<div style="display:flex;gap:6px;margin-top:6px;align-items:center"> <input type="text" id="new-opp-extra-input" placeholder="Neue Liste anlegen…" style="flex:1"> <button class="btn btn-sm btn-primary" onclick="confirmAddOppExtraList()">+</button> </div>`;
-} else {
-document.getElementById(‘opp-lists-input’).innerHTML=
-(r.oppLists||[’’,’’,’’,’’,’’]).map((l,i)=>` <div class="row"> <select onchange="G.rounds[${G.currentRound}].oppLists[${i}]=this.value;save();updateOppStrikeOpts();renderDecisionSelects();renderStrikeHeatmap()"> ${oppListOpts(l)} </select> </div>`).join(’’)+
-`<div style="display:flex;gap:6px;margin-top:6px;align-items:center"> <input type="text" id="new-opp-extra-input" placeholder="Neue Liste anlegen…" style="flex:1"> <button class="btn btn-sm btn-primary" onclick="confirmAddOppExtraList()">+</button> </div>`;
-}
-updateOppStrikeOpts();
+  if(hasTeam){
+    const team=G.tourneyTeams[r.teamIdx];
+    document.getElementById('opp-lists-input').innerHTML=
+      team.lists.map((l,i)=>`
+        <div class="row">
+          <select onchange="G.tourneyTeams[${r.teamIdx}].lists[${i}]={type:this.value.startsWith('extra:')?'extra':'meta',val:this.value.startsWith('extra:')?this.value.slice(6):this.value,manual:''};save();renderStrike();updateOppStrikeOpts();renderDecisionSelects()">
+            ${oppListOpts(l.type==='extra'?`extra:${l.val}`:l.val)}
+          </select>
+        </div>`).join('')+
+      `<div style="display:flex;gap:6px;margin-top:6px;align-items:center">
+        <input type="text" id="new-opp-extra-input" placeholder="Neue Liste anlegen…" style="flex:1">
+        <button class="btn btn-sm btn-primary" onclick="confirmAddOppExtraList()">+</button>
+      </div>`;
+  } else {
+    document.getElementById('opp-lists-input').innerHTML=
+      (r.oppLists||['','','','','']).map((l,i)=>`
+        <div class="row">
+          <select onchange="G.rounds[${G.currentRound}].oppLists[${i}]=this.value;save();updateOppStrikeOpts();renderDecisionSelects();renderStrikeHeatmap()">
+            ${oppListOpts(l)}
+          </select>
+        </div>`).join('')+
+      `<div style="display:flex;gap:6px;margin-top:6px;align-items:center">
+        <input type="text" id="new-opp-extra-input" placeholder="Neue Liste anlegen…" style="flex:1">
+        <button class="btn btn-sm btn-primary" onclick="confirmAddOppExtraList()">+</button>
+      </div>`;
+  }
+  updateOppStrikeOpts();
 
-const scores=myLists.map((c,li)=>({name:c.name,li,avg:avgForList(G.selectedCombo[li],ci)}));
-const ratedScores=scores.filter(s=>s.avg!==null);
-const minAvg=ratedScores.length?Math.min(…ratedScores.map(s=>s.avg)):null;
-document.getElementById(‘strike-rec’).innerHTML=
-[…scores].sort((a,b)=>(a.avg??99)-(b.avg??99)).map(s=>{
-if(s.avg===null)return`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee"> <span style="font-size:13px">${s.name}</span> <span style="font-size:11px;color:#ccc">nicht bewertet</span> </div>`;
-const cls=chipCls(s.avg);const isW=minAvg!==null&&Math.abs(s.avg-minAvg)<0.001;
-return`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee"> <span style="font-size:13px">${s.name}</span> <div style="display:flex;align-items:center;gap:6px"> <span class="chip chip-${cls}">${chipLbl(cls)}</span> <span style="font-size:11px;font-family:var(--mono);color:#888">${s.avg.toFixed(2)}</span> ${isW?'<span style="font-size:10px;color:#804000;border:1px solid #e0a040;border-radius:4px;padding:1px 5px">streichen?</span>':''} </div> </div>`;
-}).join(’’);
+  const scores=myLists.map((c,li)=>({name:c.name,li,avg:avgForList(G.selectedCombo[li],ci)}));
+  const ratedScores=scores.filter(s=>s.avg!==null);
+  const minAvg=ratedScores.length?Math.min(...ratedScores.map(s=>s.avg)):null;
+  document.getElementById('strike-rec').innerHTML=
+    [...scores].sort((a,b)=>(a.avg??99)-(b.avg??99)).map(s=>{
+      if(s.avg===null)return`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee">
+        <span style="font-size:13px">${s.name}</span>
+        <span style="font-size:11px;color:#ccc">nicht bewertet</span>
+      </div>`;
+      const cls=chipCls(s.avg);const isW=minAvg!==null&&Math.abs(s.avg-minAvg)<0.001;
+      return`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee">
+        <span style="font-size:13px">${s.name}</span>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span class="chip chip-${cls}">${chipLbl(cls)}</span>
+          <span style="font-size:11px;font-family:var(--mono);color:#888">${s.avg.toFixed(2)}</span>
+          ${isW?'<span style="font-size:10px;color:#804000;border:1px solid #e0a040;border-radius:4px;padding:1px 5px">streichen?</span>':''}
+        </div>
+      </div>`;
+    }).join('');
 
-const mySel=document.getElementById(‘my-strike-sel’);
-if(mySel){
-const myStruck=r.myStruck!==’’?parseInt(r.myStruck):-1;
-mySel.innerHTML=’<option value="">– wählen –</option>’+
-myLists.map((c,i)=>`<option value="${i}"${myStruck===i?' selected':''}>${c.name}</option>`).join(’’);
-}
-renderStrikeHeatmap();
-renderAttack();
+  const mySel=document.getElementById('my-strike-sel');
+  if(mySel){
+    const myStruck=r.myStruck!==''?parseInt(r.myStruck):-1;
+    mySel.innerHTML='<option value="">– wählen –</option>'+
+      myLists.map((c,i)=>`<option value="${i}"${myStruck===i?' selected':''}>${c.name}</option>`).join('');
+  }
+  renderStrikeHeatmap();
+  renderAttack();
 }
 function updateOppStrikeOpts(){
-const r=R();const valid=getOppLists().filter(l=>l.trim());
-const sel=document.getElementById(‘opp-strike-sel’);
-if(sel)sel.innerHTML=’<option value="">– wählen –</option>’+valid.map(l=>`<option value="${l}"${r.oppStruck===l?' selected':''}>${l}</option>`).join(’’);
+  const r=R();const valid=getOppLists().filter(l=>l.trim());
+  const sel=document.getElementById('opp-strike-sel');
+  if(sel)sel.innerHTML='<option value="">– wählen –</option>'+valid.map(l=>`<option value="${l}"${r.oppStruck===l?' selected':''}>${l}</option>`).join('');
 }
 
 // Attack
 function renderAttack(){
-if(!G.selectedCombo)return;
-const r=R();
-const sc=getActiveSzenarien();
-const ci=sc.indexOf(r.scenario||’’);
-const myStruck=r.myStruck!==’’?parseInt(r.myStruck):-1;
-const myLists=G.selectedCombo.map(i=>G.candidates[i]).filter(Boolean);
-const oppLists=getOppLists().filter(l=>l.trim()&&l!==r.oppStruck);
-const available=myLists.filter((_,i)=>i!==myStruck);
+  if(!G.selectedCombo)return;
+  const r=R();
+  const sc=getActiveSzenarien();
+  const ci=sc.indexOf(r.scenario||'');
+  const myStruck=r.myStruck!==''?parseInt(r.myStruck):-1;
+  const myLists=G.selectedCombo.map(i=>G.candidates[i]).filter(Boolean);
+  const oppLists=getOppLists().filter(l=>l.trim()&&l!==r.oppStruck);
+  const available=myLists.filter((_,i)=>i!==myStruck);
 
-if(!available.length){document.getElementById(‘attack-rec’).innerHTML=’<p class="hint">Erst streichen in 2a.</p>’;return;}
+  if(!available.length){document.getElementById('attack-rec').innerHTML='<p class="hint">Erst streichen in 2a.</p>';return;}
 
-const getVal=(realLi,opp)=>{
-if(ci<0)return’’;
-const ei=G.enemies.indexOf(opp);
-if(ei>=0)return getR(realLi,ei,ci)||’’;
-const xi=(G.extraLists||[]).indexOf(opp);
-if(xi>=0)return(G.extraMatrix||{})[`${realLi}_${xi}_${ci}`]||’’;
-return’’;
-};
+  const getVal=(realLi,opp)=>{
+    if(ci<0)return'';
+    const ei=G.enemies.indexOf(opp);
+    if(ei>=0)return getR(realLi,ei,ci)||'';
+    const xi=(G.extraLists||[]).indexOf(opp);
+    if(xi>=0)return(G.extraMatrix||{})[`${realLi}_${xi}_${ci}`]||'';
+    return'';
+  };
 
-let html=’’;
-available.forEach((c,localI)=>{
-const globalI=myLists.indexOf(c);
-const realLi=G.selectedCombo[globalI];
-const isPicked=r.attacker===String(globalI);
+  let html='';
+  available.forEach((c,localI)=>{
+    const globalI=myLists.indexOf(c);
+    const realLi=G.selectedCombo[globalI];
+    const isPicked=r.attacker===String(globalI);
 
-```
-// Counter count: how many opp lists have − or −− vs this list
-const counters=oppLists.filter(opp=>{
-  const v=getVal(realLi,opp);
-  return v==='lu'||v==='ku';
-});
+    // Counter count: how many opp lists have − or −− vs this list
+    const counters=oppLists.filter(opp=>{
+      const v=getVal(realLi,opp);
+      return v==='lu'||v==='ku';
+    });
 
-// Pool quality: avg of remaining 3 lists vs all opp lists
-const poolLists=available.filter(p=>p!==c);
-const poolVals=poolLists.flatMap(p=>{
-  const pRealLi=G.selectedCombo[myLists.indexOf(p)];
-  return oppLists.map(opp=>{
-    const v=getVal(pRealLi,opp);
-    return v?getPts(v):null;
-  }).filter(v=>v!==null);
-});
-const poolAvg=poolVals.length?poolVals.reduce((a,b)=>a+b,0)/poolVals.length:null;
-const poolCls=poolAvg!==null?chipCls(poolAvg):null;
+    // Pool quality: avg of remaining 3 lists vs all opp lists
+    const poolLists=available.filter(p=>p!==c);
+    const poolVals=poolLists.flatMap(p=>{
+      const pRealLi=G.selectedCombo[myLists.indexOf(p)];
+      return oppLists.map(opp=>{
+        const v=getVal(pRealLi,opp);
+        return v?getPts(v):null;
+      }).filter(v=>v!==null);
+    });
+    const poolAvg=poolVals.length?poolVals.reduce((a,b)=>a+b,0)/poolVals.length:null;
+    const poolCls=poolAvg!==null?chipCls(poolAvg):null;
 
-// Own ratings vs opp lists
-const ownRatings=oppLists.map(opp=>({opp,val:getVal(realLi,opp)}));
+    // Own ratings vs opp lists
+    const ownRatings=oppLists.map(opp=>({opp,val:getVal(realLi,opp)}));
 
-const counterColor=counters.length===0?'#4a8c10':counters.length===1?'#b08000':'#c00';
+    const counterColor=counters.length===0?'#4a8c10':counters.length===1?'#b08000':'#c00';
 
-html+=`<div onclick="R().attacker='${globalI}';save();renderAttack()" style="border:1px solid ${isPicked?'#6ab820':'#ddd'};border-radius:10px;padding:14px;margin-bottom:10px;background:${isPicked?'#f4fbe8':'#fff'};cursor:pointer">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-    <span style="font-size:15px;font-weight:600">${c.name}</span>
-    <div style="display:flex;align-items:center;gap:8px">
-      <span style="font-size:12px;font-weight:600;color:${counterColor};border:1px solid ${counterColor};border-radius:4px;padding:2px 8px">${counters.length} Konter</span>
-      ${isPicked?'<span style="font-size:11px;color:#4a8c10;font-weight:600">✓ Angreifer</span>':''}
-    </div>
-  </div>
-  <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">
-    ${ownRatings.map(({opp,val})=>`
-      <div style="display:flex;align-items:center;gap:4px;background:#f5f4f0;border-radius:6px;padding:4px 8px">
-        <span style="font-size:11px;color:#555">${opp.length>10?opp.slice(0,9)+'…':opp}</span>
-        ${val?`<span class="chip chip-${val}">${RATINGS.find(x=>x.val===val)?.label}</span>`:'<span style="font-size:11px;color:#ccc">·</span>'}
-      </div>`).join('')}
-  </div>
-  <div style="display:flex;align-items:center;gap:8px;padding-top:8px;border-top:1px solid #eee">
-    <span style="font-size:11px;color:#888">Pool ohne diese Liste:</span>
-    ${poolCls?`<span class="chip chip-${poolCls}">${chipLbl(poolCls)}</span><span style="font-size:11px;font-family:var(--mono);color:#888">${poolAvg.toFixed(2)}</span>`:'<span style="font-size:11px;color:#ccc">keine Daten</span>'}
-  </div>
-</div>`;
-```
+    html+=`<div onclick="R().attacker='${globalI}';save();renderAttack()" style="border:1px solid ${isPicked?'#6ab820':'#ddd'};border-radius:10px;padding:14px;margin-bottom:10px;background:${isPicked?'#f4fbe8':'#fff'};cursor:pointer">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <span style="font-size:15px;font-weight:600">${c.name}</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:12px;font-weight:600;color:${counterColor};border:1px solid ${counterColor};border-radius:4px;padding:2px 8px">${counters.length} Konter</span>
+          ${isPicked?'<span style="font-size:11px;color:#4a8c10;font-weight:600">✓ Angreifer</span>':''}
+        </div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">
+        ${ownRatings.map(({opp,val})=>`
+          <div style="display:flex;align-items:center;gap:4px;background:#f5f4f0;border-radius:6px;padding:4px 8px">
+            <span style="font-size:11px;color:#555">${opp.length>10?opp.slice(0,9)+'…':opp}</span>
+            ${val?`<span class="chip chip-${val}">${RATINGS.find(x=>x.val===val)?.label}</span>`:'<span style="font-size:11px;color:#ccc">·</span>'}
+          </div>`).join('')}
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;padding-top:8px;border-top:1px solid #eee">
+        <span style="font-size:11px;color:#888">Pool ohne diese Liste:</span>
+        ${poolCls?`<span class="chip chip-${poolCls}">${chipLbl(poolCls)}</span><span style="font-size:11px;font-family:var(--mono);color:#888">${poolAvg.toFixed(2)}</span>`:'<span style="font-size:11px;color:#ccc">keine Daten</span>'}
+      </div>
+    </div>`;
+  });
 
-});
-
-document.getElementById(‘attack-rec’).innerHTML=html||’<p class="hint">Keine Daten.</p>’;
+  document.getElementById('attack-rec').innerHTML=html||'<p class="hint">Keine Daten.</p>';
 }
 
 // Defend
 function renderDefend(){
-if(!G.selectedCombo)return;
-const r=R();
-const sc=getActiveSzenarien();
-const ci=sc.indexOf(r.scenario||’’);
-const myStruck=r.myStruck!==’’?parseInt(r.myStruck):-1;
-const myLists=G.selectedCombo.map(i=>G.candidates[i]).filter(Boolean);
-const oppLists=getOppLists().filter(l=>l.trim()&&l!==r.oppStruck);
+  if(!G.selectedCombo)return;
+  const r=R();
+  const sc=getActiveSzenarien();
+  const ci=sc.indexOf(r.scenario||'');
+  const myStruck=r.myStruck!==''?parseInt(r.myStruck):-1;
+  const myLists=G.selectedCombo.map(i=>G.candidates[i]).filter(Boolean);
+  const oppLists=getOppLists().filter(l=>l.trim()&&l!==r.oppStruck);
 
-// Populate opp attacker dropdown
-const atkSel=document.getElementById(‘opp-attacker-sel’);
-if(atkSel){
-atkSel.innerHTML=’<option value="">– wählen –</option>’+
-oppLists.map(l=>`<option value="${l}"${r.oppAttacker===l?' selected':''}>${l}</option>`).join(’’);
-}
+  // Populate opp attacker dropdown
+  const atkSel=document.getElementById('opp-attacker-sel');
+  if(atkSel){
+    atkSel.innerHTML='<option value="">– wählen –</option>'+
+      oppLists.map(l=>`<option value="${l}"${r.oppAttacker===l?' selected':''}>${l}</option>`).join('');
+  }
 
-const wrap=document.getElementById(‘defend-combos’);
-const oppAtk=r.oppAttacker||’’;
-if(!oppAtk){wrap.innerHTML=’<p class="hint" style="margin-top:12px">Erst gegnerischen Angreifer wählen.</p>’;return;}
+  const wrap=document.getElementById('defend-combos');
+  const oppAtk=r.oppAttacker||'';
+  if(!oppAtk){wrap.innerHTML='<p class="hint" style="margin-top:12px">Erst gegnerischen Angreifer wählen.</p>';return;}
 
-const atkIdx=r.attacker!==’’?parseInt(r.attacker):-1;
-const available=myLists.filter((_,i)=>i!==myStruck&&i!==atkIdx);
-if(available.length<3){wrap.innerHTML=’<p class="hint">Zu wenige Listen verfügbar. Erst Angreifer in 2b wählen.</p>’;return;}
+  const atkIdx=r.attacker!==''?parseInt(r.attacker):-1;
+  const available=myLists.filter((_,i)=>i!==myStruck&&i!==atkIdx);
+  if(available.length<3){wrap.innerHTML='<p class="hint">Zu wenige Listen verfügbar. Erst Angreifer in 2b wählen.</p>';return;}
 
-// Remaining opp lists (not attacker)
-const oppRemaining=oppLists.filter(l=>l!==oppAtk);
+  // Remaining opp lists (not attacker)
+  const oppRemaining=oppLists.filter(l=>l!==oppAtk);
 
-const getVal=(realLi,opp)=>{
-if(ci<0)return’’;
-const ei=G.enemies.indexOf(opp);
-if(ei>=0)return getR(realLi,ei,ci)||’’;
-const xi=(G.extraLists||[]).indexOf(opp);
-if(xi>=0)return(G.extraMatrix||{})[`${realLi}_${xi}_${ci}`]||’’;
-return’’;
-};
+  const getVal=(realLi,opp)=>{
+    if(ci<0)return'';
+    const ei=G.enemies.indexOf(opp);
+    if(ei>=0)return getR(realLi,ei,ci)||'';
+    const xi=(G.extraLists||[]).indexOf(opp);
+    if(xi>=0)return(G.extraMatrix||{})[`${realLi}_${xi}_${ci}`]||'';
+    return'';
+  };
 
-// All 3 combinations of 2 defenders from 3 available lists
-const combos=[];
-for(let a=0;a<available.length;a++){
-for(let b=a+1;b<available.length;b++){
-const defenders=[available[a],available[b]];
-const pool=available.find((_,i)=>i!==a&&i!==b);
-combos.push({defenders,pool});
-}
-}
+  // All 3 combinations of 2 defenders from 3 available lists
+  const combos=[];
+  for(let a=0;a<available.length;a++){
+    for(let b=a+1;b<available.length;b++){
+      const defenders=[available[a],available[b]];
+      const pool=available.find((_,i)=>i!==a&&i!==b);
+      combos.push({defenders,pool});
+    }
+  }
 
-let html=’’;
-combos.forEach(({defenders,pool},ci2)=>{
-const poolRealLi=G.selectedCombo[myLists.indexOf(pool)];
+  let html='';
+  combos.forEach(({defenders,pool},ci2)=>{
+    const poolRealLi=G.selectedCombo[myLists.indexOf(pool)];
 
-```
-const defRatings=defenders.map(d=>{
-  const realLi=G.selectedCombo[myLists.indexOf(d)];
-  const val=getVal(realLi,oppAtk);
-  return{name:d.name,val};
-});
+    const defRatings=defenders.map(d=>{
+      const realLi=G.selectedCombo[myLists.indexOf(d)];
+      const val=getVal(realLi,oppAtk);
+      return{name:d.name,val};
+    });
 
-const poolRatings=oppRemaining.map(opp=>({
-  opp,val:getVal(poolRealLi,opp)
-}));
+    const poolRatings=oppRemaining.map(opp=>({
+      opp,val:getVal(poolRealLi,opp)
+    }));
 
-const defPts=defRatings.map(d=>d.val?getPts(d.val):1.0);
-const worstDef=Math.min(...defPts);
-const isPicked=r.defA===defenders[0].name&&r.defB===defenders[1].name;
-const borderColor=isPicked?'#6ab820':worstDef>=1.5?'#90c040':worstDef>=1.0?'#ddd':'#e08080';
+    const defPts=defRatings.map(d=>d.val?getPts(d.val):1.0);
+    const worstDef=Math.min(...defPts);
+    const isPicked=r.defA===defenders[0].name&&r.defB===defenders[1].name;
+    const borderColor=isPicked?'#6ab820':worstDef>=1.5?'#90c040':worstDef>=1.0?'#ddd':'#e08080';
 
-html+=`<div onclick="R().defA='${defenders[0].name}';R().defB='${defenders[1].name}';R().pool=String(${myLists.indexOf(pool)});save();renderDefend()"
-  style="border:1px solid ${borderColor};border-radius:10px;padding:14px;margin-bottom:10px;background:${isPicked?'#f4fbe8':'#fff'};cursor:pointer">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-    <span style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.05em">Kombi ${ci2+1}</span>
-    ${isPicked?'<span style="font-size:11px;color:#4a8c10;font-weight:600">✓ Gewählt</span>':''}
-  </div>
+    html+=`<div onclick="R().defA='${defenders[0].name}';R().defB='${defenders[1].name}';R().pool=String(${myLists.indexOf(pool)});save();renderDefend()"
+      style="border:1px solid ${borderColor};border-radius:10px;padding:14px;margin-bottom:10px;background:${isPicked?'#f4fbe8':'#fff'};cursor:pointer">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <span style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.05em">Kombi ${ci2+1}</span>
+        ${isPicked?'<span style="font-size:11px;color:#4a8c10;font-weight:600">✓ Gewählt</span>':''}
+      </div>
 
-  <div style="margin-bottom:10px">
-    <div style="font-size:11px;color:#888;margin-bottom:6px">Verteidiger vs <strong>${oppAtk}</strong></div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
-      ${defRatings.map(d=>`
-        <div style="display:flex;align-items:center;gap:6px;background:#f5f4f0;border-radius:6px;padding:6px 10px">
-          <span style="font-size:13px;font-weight:600">${d.name}</span>
-          ${d.val?`<span class="chip chip-${d.val}">${RATINGS.find(x=>x.val===d.val)?.label}</span>`:'<span style="font-size:11px;color:#ccc">·</span>'}
-        </div>`).join('')}
-    </div>
-  </div>
+      <div style="margin-bottom:10px">
+        <div style="font-size:11px;color:#888;margin-bottom:6px">Verteidiger vs <strong>${oppAtk}</strong></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          ${defRatings.map(d=>`
+            <div style="display:flex;align-items:center;gap:6px;background:#f5f4f0;border-radius:6px;padding:6px 10px">
+              <span style="font-size:13px;font-weight:600">${d.name}</span>
+              ${d.val?`<span class="chip chip-${d.val}">${RATINGS.find(x=>x.val===d.val)?.label}</span>`:'<span style="font-size:11px;color:#ccc">·</span>'}
+            </div>`).join('')}
+        </div>
+      </div>
 
-  <div style="padding-top:10px;border-top:1px solid #eee">
-    <div style="font-size:11px;color:#888;margin-bottom:6px">Pool: <strong>${pool.name}</strong> vs verbleibende Gegner</div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap">
-      ${poolRatings.length?poolRatings.map(({opp,val})=>`
-        <div style="display:flex;align-items:center;gap:4px;background:#f5f4f0;border-radius:6px;padding:4px 8px">
-          <span style="font-size:11px;color:#555">${opp.length>10?opp.slice(0,9)+'…':opp}</span>
-          ${val?`<span class="chip chip-${val}">${RATINGS.find(x=>x.val===val)?.label}</span>`:'<span style="font-size:11px;color:#ccc">·</span>'}
-        </div>`).join(''):'<span class="hint">Keine verbleibenden Gegner-Listen</span>'}
-    </div>
-  </div>
-</div>`;
-```
+      <div style="padding-top:10px;border-top:1px solid #eee">
+        <div style="font-size:11px;color:#888;margin-bottom:6px">Pool: <strong>${pool.name}</strong> vs verbleibende Gegner</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          ${poolRatings.length?poolRatings.map(({opp,val})=>`
+            <div style="display:flex;align-items:center;gap:4px;background:#f5f4f0;border-radius:6px;padding:4px 8px">
+              <span style="font-size:11px;color:#555">${opp.length>10?opp.slice(0,9)+'…':opp}</span>
+              ${val?`<span class="chip chip-${val}">${RATINGS.find(x=>x.val===val)?.label}</span>`:'<span style="font-size:11px;color:#ccc">·</span>'}
+            </div>`).join(''):'<span class="hint">Keine verbleibenden Gegner-Listen</span>'}
+        </div>
+      </div>
+    </div>`;
+  });
 
-});
-
-wrap.innerHTML=html;
+  wrap.innerHTML=html;
 }
 
 // Decision
 function renderDecisionSelects(){
-if(!G.selectedCombo)return;
-const r=R();
-const myLists=G.selectedCombo.map(i=>G.candidates[i]).filter(Boolean);
-const myStruck=r.myStruck!==’’?parseInt(r.myStruck):-1;
-const available=myLists.filter((_,i)=>i!==myStruck);
-const listOpts=’<option value="">– wählen –</option>’+myLists.map((c,i)=>`<option value="${i}">${c.name}</option>`).join(’’);
-const atkEl=document.getElementById(‘d-attacker’);const poolEl=document.getElementById(‘d-pool’);
-if(atkEl){atkEl.innerHTML=listOpts;if(r.attacker!==’’)atkEl.value=r.attacker;}
-if(poolEl){poolEl.innerHTML=listOpts;if(r.pool!==’’)poolEl.value=r.pool;}
-const oppActive=getOppLists().filter(l=>l.trim()&&l!==r.oppStruck);
-const defOpts=’<option value="">– wählen –</option>’+oppActive.map(l=>`<option value="${l}">${l}</option>`).join(’’);
-const daEl=document.getElementById(‘d-def-a’);const dbEl=document.getElementById(‘d-def-b’);
-if(daEl){daEl.innerHTML=defOpts;if(r.defA)daEl.value=r.defA;}
-if(dbEl){dbEl.innerHTML=defOpts;if(r.defB)dbEl.value=r.defB;}
-renderDecision();
+  if(!G.selectedCombo)return;
+  const r=R();
+  const myLists=G.selectedCombo.map(i=>G.candidates[i]).filter(Boolean);
+  const myStruck=r.myStruck!==''?parseInt(r.myStruck):-1;
+  const available=myLists.filter((_,i)=>i!==myStruck);
+  const listOpts='<option value="">– wählen –</option>'+myLists.map((c,i)=>`<option value="${i}">${c.name}</option>`).join('');
+  const atkEl=document.getElementById('d-attacker');const poolEl=document.getElementById('d-pool');
+  if(atkEl){atkEl.innerHTML=listOpts;if(r.attacker!=='')atkEl.value=r.attacker;}
+  if(poolEl){poolEl.innerHTML=listOpts;if(r.pool!=='')poolEl.value=r.pool;}
+  const oppActive=getOppLists().filter(l=>l.trim()&&l!==r.oppStruck);
+  const defOpts='<option value="">– wählen –</option>'+oppActive.map(l=>`<option value="${l}">${l}</option>`).join('');
+  const daEl=document.getElementById('d-def-a');const dbEl=document.getElementById('d-def-b');
+  if(daEl){daEl.innerHTML=defOpts;if(r.defA)daEl.value=r.defA;}
+  if(dbEl){dbEl.innerHTML=defOpts;if(r.defB)dbEl.value=r.defB;}
+  renderDecision();
 }
 
 function saveMasterVal(realLi,oppName,val,roundIdx){
-const r=G.rounds[roundIdx];
-const sc=getActiveSzenarien();
-const ci=sc.indexOf(r.scenario||’’);
-if(ci<0){r.mRatings[`${realLi}_${oppName}`]=val;save();return;}
-const ei=G.enemies.indexOf(oppName);
-if(ei>=0){G.matrix[mkey(realLi,ei,ci)]=val;save();return;}
-const xi=(G.extraLists||[]).indexOf(oppName);
-if(xi>=0){if(!G.extraMatrix)G.extraMatrix={};G.extraMatrix[`${realLi}_${xi}_${ci}`]=val;save();return;}
-r.mRatings[`${realLi}_${oppName}`]=val;save();
+  const r=G.rounds[roundIdx];
+  const sc=getActiveSzenarien();
+  const ci=sc.indexOf(r.scenario||'');
+  if(ci<0){r.mRatings[`${realLi}_${oppName}`]=val;save();return;}
+  const ei=G.enemies.indexOf(oppName);
+  if(ei>=0){G.matrix[mkey(realLi,ei,ci)]=val;save();return;}
+  const xi=(G.extraLists||[]).indexOf(oppName);
+  if(xi>=0){if(!G.extraMatrix)G.extraMatrix={};G.extraMatrix[`${realLi}_${xi}_${ci}`]=val;save();return;}
+  r.mRatings[`${realLi}_${oppName}`]=val;save();
 }
 
 function renderDecision(){
-if(!G.selectedCombo)return;
-const r=R();
-const atkIdx=r.attacker!==’’?parseInt(r.attacker):-1;
-const poolIdx=r.pool!==’’?parseInt(r.pool):-1;
-const defA=r.defA||’’;const defB=r.defB||’’;
-const detail=document.getElementById(‘decision-detail’);
-if(atkIdx<0||poolIdx<0||!defA||!defB||atkIdx===poolIdx){detail.style.display=‘none’;return;}
-detail.style.display=‘block’;
+  if(!G.selectedCombo)return;
+  const r=R();
+  const atkIdx=r.attacker!==''?parseInt(r.attacker):-1;
+  const poolIdx=r.pool!==''?parseInt(r.pool):-1;
+  const defA=r.defA||'';const defB=r.defB||'';
+  const detail=document.getElementById('decision-detail');
+  if(atkIdx<0||poolIdx<0||!defA||!defB||atkIdx===poolIdx){detail.style.display='none';return;}
+  detail.style.display='block';
 
-const ci=getActiveSzenarien().indexOf(r.scenario||’’);
-const myLists=G.selectedCombo.map(i=>G.candidates[i]).filter(Boolean);
-const atkName=myLists[atkIdx]?.name||’’;const poolName=myLists[poolIdx]?.name||’’;
-const atkRealLi=G.selectedCombo[atkIdx];const poolRealLi=G.selectedCombo[poolIdx];
+  const ci=getActiveSzenarien().indexOf(r.scenario||'');
+  const myLists=G.selectedCombo.map(i=>G.candidates[i]).filter(Boolean);
+  const atkName=myLists[atkIdx]?.name||'';const poolName=myLists[poolIdx]?.name||'';
+  const atkRealLi=G.selectedCombo[atkIdx];const poolRealLi=G.selectedCombo[poolIdx];
 
-document.getElementById(‘decision-cat-label’).textContent=`Matchup · ${r.scenario||'kein Szenario'}`;
+  document.getElementById('decision-cat-label').textContent=`Matchup · ${r.scenario||'kein Szenario'}`;
 
-function getMasterVal(realLi,oppName){
-const ei=G.enemies.indexOf(oppName);
-if(ei>=0&&ci>=0)return getR(realLi,ei,ci)||’’;
-const xi=(G.extraLists||[]).indexOf(oppName);
-if(xi>=0&&ci>=0)return(G.extraMatrix||{})[`${realLi}_${xi}_${ci}`]||’’;
-return R().mRatings[`${realLi}_${oppName}`]||’’;
-}
+  function getMasterVal(realLi,oppName){
+    const ei=G.enemies.indexOf(oppName);
+    if(ei>=0&&ci>=0)return getR(realLi,ei,ci)||'';
+    const xi=(G.extraLists||[]).indexOf(oppName);
+    if(xi>=0&&ci>=0)return(G.extraMatrix||{})[`${realLi}_${xi}_${ci}`]||'';
+    return R().mRatings[`${realLi}_${oppName}`]||'';
+  }
 
-function mBlock(id,realLi,oppName,label){
-const cur=getMasterVal(realLi,oppName)||‘50’;
-let html=`<div class="label" style="margin-bottom:4px">${label}</div>`;
-html+=`<select class="rating-sel r-${cur}" id="${id}" onchange="saveMasterVal(${realLi},'${oppName.replace(/'/g,"\\'")}',this.value,${G.currentRound});calcResult();this.className='rating-sel r-'+this.value"> ${RATINGS.map(rt=>`<option value=”${rt.val}”${cur===rt.val?’ selected’:’’}>${rt.label}</option>`).join('')} </select>`;
-return html;
-}
+  function mBlock(id,realLi,oppName,label){
+    const cur=getMasterVal(realLi,oppName)||'50';
+    let html=`<div class="label" style="margin-bottom:4px">${label}</div>`;
+    html+=`<select class="rating-sel r-${cur}" id="${id}"
+      onchange="saveMasterVal(${realLi},'${oppName.replace(/'/g,"\\'")}',this.value,${G.currentRound});calcResult();this.className='rating-sel r-'+this.value">
+      ${RATINGS.map(rt=>`<option value="${rt.val}"${cur===rt.val?' selected':''}>${rt.label}</option>`).join('')}
+    </select>`;
+    return html;
+  }
 
-document.getElementById(‘d-m-inputs’).innerHTML=` <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px"> <div>${mBlock('atk_a',atkRealLi,defA,`${atkName} vs ${defA}`)}</div> <div>${mBlock('atk_b',atkRealLi,defB,`${atkName} vs ${defB}`)}</div> <div>${mBlock('pool_b',poolRealLi,defB,`${poolName} vs ${defB} (auto wenn A)`)}</div> <div>${mBlock('pool_a',poolRealLi,defA,`${poolName} vs ${defA} (auto wenn B)`)}</div> </div>`;
-calcResult();
+  document.getElementById('d-m-inputs').innerHTML=`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div>${mBlock('atk_a',atkRealLi,defA,`${atkName} vs ${defA}`)}</div>
+      <div>${mBlock('atk_b',atkRealLi,defB,`${atkName} vs ${defB}`)}</div>
+      <div>${mBlock('pool_b',poolRealLi,defB,`${poolName} vs ${defB} (auto wenn A)`)}</div>
+      <div>${mBlock('pool_a',poolRealLi,defA,`${poolName} vs ${defA} (auto wenn B)`)}</div>
+    </div>`;
+  calcResult();
 }
 
 function calcResult(){
-const r=R();
-const atkIdx=r.attacker!==’’?parseInt(r.attacker):-1;
-const poolIdx=r.pool!==’’?parseInt(r.pool):-1;
-if(atkIdx<0||poolIdx<0||!r.defA||!r.defB)return;
-const myLists=G.selectedCombo.map(i=>G.candidates[i]).filter(Boolean);
-const sc=getActiveSzenarien();
-const ci=sc.indexOf(r.scenario||’’);
-const atkRealLi=G.selectedCombo[atkIdx];
-const poolRealLi=G.selectedCombo[poolIdx];
+  const r=R();
+  const atkIdx=r.attacker!==''?parseInt(r.attacker):-1;
+  const poolIdx=r.pool!==''?parseInt(r.pool):-1;
+  if(atkIdx<0||poolIdx<0||!r.defA||!r.defB)return;
+  const myLists=G.selectedCombo.map(i=>G.candidates[i]).filter(Boolean);
+  const sc=getActiveSzenarien();
+  const ci=sc.indexOf(r.scenario||'');
+  const atkRealLi=G.selectedCombo[atkIdx];
+  const poolRealLi=G.selectedCombo[poolIdx];
 
-function getVal(realLi,oppName){
-if(ci>=0){
-const ei=G.enemies.indexOf(oppName);
-if(ei>=0)return getR(realLi,ei,ci)||‘50’;
-const xi=(G.extraLists||[]).indexOf(oppName);
-if(xi>=0)return(G.extraMatrix||{})[`${realLi}_${xi}_${ci}`]||‘50’;
-}
-return r.mRatings[`${realLi}_${oppName}`]||‘50’;
-}
+  function getVal(realLi,oppName){
+    if(ci>=0){
+      const ei=G.enemies.indexOf(oppName);
+      if(ei>=0)return getR(realLi,ei,ci)||'50';
+      const xi=(G.extraLists||[]).indexOf(oppName);
+      if(xi>=0)return(G.extraMatrix||{})[`${realLi}_${xi}_${ci}`]||'50';
+    }
+    return r.mRatings[`${realLi}_${oppName}`]||'50';
+  }
 
-const chooseA=getPts(getVal(atkRealLi,r.defA))+getPts(getVal(poolRealLi,r.defB));
-const chooseB=getPts(getVal(atkRealLi,r.defB))+getPts(getVal(poolRealLi,r.defA));
-const diff=Math.abs(chooseA-chooseB);const bestA=chooseA>=chooseB;
-document.getElementById(‘d-result’).innerHTML=` <div class="matchup-box${bestA?' best':''}"> <div class="label">Angreifer → ${r.defA}</div> <div class="result-pts">${chooseA.toFixed(2)} <span style="font-size:13px;font-weight:400;color:var(--text3)">erwartet</span></div> <div class="hint">${myLists[atkIdx]?.name} vs ${r.defA} · ${myLists[poolIdx]?.name} vs ${r.defB} (auto)</div> </div> <div class="matchup-box${!bestA?' best':''}"> <div class="label">Angreifer → ${r.defB}</div> <div class="result-pts">${chooseB.toFixed(2)} <span style="font-size:13px;font-weight:400;color:var(--text3)">erwartet</span></div> <div class="hint">${myLists[atkIdx]?.name} vs ${r.defB} · ${myLists[poolIdx]?.name} vs ${r.defA} (auto)</div> </div> <div class="${diff>0.3?'box-ok':'box-warn'}"> ${diff>0.3?`Empfehlung: Angreifer gegen <strong>${bestA?r.defA:r.defB}</strong> (+${diff.toFixed(2)} Pkt)`:`Knappe Entscheidung (Δ${diff.toFixed(2)}) – Bluff entscheidet`} </div>`;
+  const chooseA=getPts(getVal(atkRealLi,r.defA))+getPts(getVal(poolRealLi,r.defB));
+  const chooseB=getPts(getVal(atkRealLi,r.defB))+getPts(getVal(poolRealLi,r.defA));
+  const diff=Math.abs(chooseA-chooseB);const bestA=chooseA>=chooseB;
+  document.getElementById('d-result').innerHTML=`
+    <div class="matchup-box${bestA?' best':''}">
+      <div class="label">Angreifer → ${r.defA}</div>
+      <div class="result-pts">${chooseA.toFixed(2)} <span style="font-size:13px;font-weight:400;color:var(--text3)">erwartet</span></div>
+      <div class="hint">${myLists[atkIdx]?.name} vs ${r.defA} · ${myLists[poolIdx]?.name} vs ${r.defB} (auto)</div>
+    </div>
+    <div class="matchup-box${!bestA?' best':''}">
+      <div class="label">Angreifer → ${r.defB}</div>
+      <div class="result-pts">${chooseB.toFixed(2)} <span style="font-size:13px;font-weight:400;color:var(--text3)">erwartet</span></div>
+      <div class="hint">${myLists[atkIdx]?.name} vs ${r.defB} · ${myLists[poolIdx]?.name} vs ${r.defA} (auto)</div>
+    </div>
+    <div class="${diff>0.3?'box-ok':'box-warn'}">
+      ${diff>0.3?`Empfehlung: Angreifer gegen <strong>${bestA?r.defA:r.defB}</strong> (+${diff.toFixed(2)} Pkt)`:`Knappe Entscheidung (Δ${diff.toFixed(2)}) – Bluff entscheidet`}
+    </div>`;
 }
 
 // Results
 function renderResults(){
-if(!G.selectedCombo)return;
-const r=R();
-const myLists=G.selectedCombo.map(i=>G.candidates[i]).filter(Boolean);
-const oppAvail=getOppLists().filter(l=>l.trim()&&l!==r.oppStruck);
-const myStruck=r.myStruck!==’’?parseInt(r.myStruck):-1;
-const activePlayers=getAP(); // [{p,i}] – nur Spieler mit Namen
-let html=’’;
-if(r.oppName){
-const ourName=G.teamName||‘Wir’;
-html+=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding:10px 14px;background:#fff;border:1px solid #ddd;border-radius:10px"> <span style="font-size:13px;font-weight:600;color:#1a1a1a">${ourName}</span> <span style="font-size:13px;font-weight:600;color:#555">vs</span> <span style="font-size:13px;font-weight:600;color:#1a1a1a">${r.oppName}</span> </div>`;
-}
-// 4 Slots = 4 Spieler (Slot-Index = Spieler-Index in G.players)
-[0,1,2,3].forEach(mi=>{
-const playerName=G.players[mi]||`Spieler ${mi+1}`;
-const m=r.matchups[mi];
-const myP=m.myPts!==null?parseInt(m.myPts):null;
-const opP=m.oppPts!==null?parseInt(m.oppPts):null;
-let outcome=’’,oc=’#888’,tp=’’;
-if(myP!==null&&opP!==null){
-if(myP>opP){outcome=‘Sieg’;oc=’#4a8c10’;tp=‘2 Pkt’;}
-else if(myP===opP){outcome=‘Unentschieden’;oc=’#b08000’;tp=‘1 Pkt’;}
-else{outcome=‘Niederlage’;oc=’#c00’;tp=‘0 Pkt’;}
-}
-const myOpts=’<option value="">– Liste –</option>’+myLists.map((c,i)=>i===myStruck?’’:
-`<option value="${i}"${m.myList===String(i)?' selected':''}>${c.name}</option>`).join(’’);
-const oppOpts=’<option value="">– Liste –</option>’+oppAvail.map(l=>`<option value="${l}"${m.oppList===l?' selected':''}>${l}</option>`).join(’’);
-html+=`<div class="card"> <div style="font-size:14px;font-weight:600;color:#1a1a1a;margin-bottom:12px">${playerName}</div> <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px"> <div><div class="label">Unsere Liste</div> <select style="font-size:13px" onchange="G.rounds[${G.currentRound}].matchups[${mi}].myList=this.value;save()">${myOpts}</select> </div> <div><div class="label">Gegner-Liste</div> <select style="font-size:13px" onchange="G.rounds[${G.currentRound}].matchups[${mi}].oppList=this.value;save()">${oppOpts}</select> </div> </div> <div style="display:flex;align-items:center;gap:10px"> <div><div class="label">Unsere Pkt</div> <input type="number" min="0" max="20" value="${myP??''}" placeholder="0" oninput="G.rounds[${G.currentRound}].matchups[${mi}].myPts=this.value===''?null:parseInt(this.value);save();renderResults()"> </div> <div style="color:#888;margin-top:14px">:</div> <div><div class="label">Gegner Pkt</div> <input type="number" min="0" max="20" value="${opP??''}" placeholder="0" oninput="G.rounds[${G.currentRound}].matchups[${mi}].oppPts=this.value===''?null:parseInt(this.value);save();renderResults()"> </div> <div style="margin-top:14px;flex:1;text-align:right"> <div style="font-size:13px;font-weight:600;color:${oc}">${outcome}</div> <div style="font-size:11px;font-family:var(--mono);color:#888">${tp}</div> </div> </div> </div>`;
-});
-let totMy=0,totOpp=0,totPts=0,hasAny=false;
-r.matchups.forEach(m=>{
-if(m.myPts!==null&&m.oppPts!==null){
-hasAny=true;const mp=parseInt(m.myPts),op=parseInt(m.oppPts);
-totMy+=mp;totOpp+=op;
-if(mp>op)totPts+=2;else if(mp===op)totPts+=1;
-}
-});
-if(hasAny)html+=`<div class="card" style="border-color:var(--border2)">
-
-<div style="display:flex;justify-content:space-between;align-items:center">
-<span style="font-size:13px;color:var(--text2)">Team-Punkte</span>
-<span style="font-size:24px;font-weight:600;font-family:var(--mono);color:var(--accent)">${totPts}/8</span>
-</div>
-<div style="font-size:12px;color:var(--text3);margin-top:4px;font-family:var(--mono)">Szenario: ${totMy}:${totOpp}</div>
-
+  if(!G.selectedCombo)return;
+  const r=R();
+  const myLists=G.selectedCombo.map(i=>G.candidates[i]).filter(Boolean);
+  const oppAvail=getOppLists().filter(l=>l.trim()&&l!==r.oppStruck);
+  const myStruck=r.myStruck!==''?parseInt(r.myStruck):-1;
+  const activePlayers=getAP(); // [{p,i}] – nur Spieler mit Namen
+  let html='';
+  if(r.oppName){
+    const ourName=G.teamName||'Wir';
+    html+=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding:10px 14px;background:#fff;border:1px solid #ddd;border-radius:10px">
+      <span style="font-size:13px;font-weight:600;color:#1a1a1a">${ourName}</span>
+      <span style="font-size:13px;font-weight:600;color:#555">vs</span>
+      <span style="font-size:13px;font-weight:600;color:#1a1a1a">${r.oppName}</span>
+    </div>`;
+  }
+  // 4 Slots = 4 Spieler (Slot-Index = Spieler-Index in G.players)
+  [0,1,2,3].forEach(mi=>{
+    const playerName=G.players[mi]||`Spieler ${mi+1}`;
+    const m=r.matchups[mi];
+    const myP=m.myPts!==null?parseInt(m.myPts):null;
+    const opP=m.oppPts!==null?parseInt(m.oppPts):null;
+    let outcome='',oc='#888',tp='';
+    if(myP!==null&&opP!==null){
+      if(myP>opP){outcome='Sieg';oc='#4a8c10';tp='2 Pkt';}
+      else if(myP===opP){outcome='Unentschieden';oc='#b08000';tp='1 Pkt';}
+      else{outcome='Niederlage';oc='#c00';tp='0 Pkt';}
+    }
+    const myOpts='<option value="">– Liste –</option>'+myLists.map((c,i)=>i===myStruck?'':
+      `<option value="${i}"${m.myList===String(i)?' selected':''}>${c.name}</option>`).join('');
+    const oppOpts='<option value="">– Liste –</option>'+oppAvail.map(l=>`<option value="${l}"${m.oppList===l?' selected':''}>${l}</option>`).join('');
+    html+=`<div class="card">
+      <div style="font-size:14px;font-weight:600;color:#1a1a1a;margin-bottom:12px">${playerName}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+        <div><div class="label">Unsere Liste</div>
+          <select style="font-size:13px" onchange="G.rounds[${G.currentRound}].matchups[${mi}].myList=this.value;save()">${myOpts}</select>
+        </div>
+        <div><div class="label">Gegner-Liste</div>
+          <select style="font-size:13px" onchange="G.rounds[${G.currentRound}].matchups[${mi}].oppList=this.value;save()">${oppOpts}</select>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div><div class="label">Unsere Pkt</div>
+          <input type="number" min="0" max="20" value="${myP??''}" placeholder="0"
+            oninput="G.rounds[${G.currentRound}].matchups[${mi}].myPts=this.value===''?null:parseInt(this.value);save();renderResults()">
+        </div>
+        <div style="color:#888;margin-top:14px">:</div>
+        <div><div class="label">Gegner Pkt</div>
+          <input type="number" min="0" max="20" value="${opP??''}" placeholder="0"
+            oninput="G.rounds[${G.currentRound}].matchups[${mi}].oppPts=this.value===''?null:parseInt(this.value);save();renderResults()">
+        </div>
+        <div style="margin-top:14px;flex:1;text-align:right">
+          <div style="font-size:13px;font-weight:600;color:${oc}">${outcome}</div>
+          <div style="font-size:11px;font-family:var(--mono);color:#888">${tp}</div>
+        </div>
+      </div>
+    </div>`;
+  });
+  let totMy=0,totOpp=0,totPts=0,hasAny=false;
+  r.matchups.forEach(m=>{
+    if(m.myPts!==null&&m.oppPts!==null){
+      hasAny=true;const mp=parseInt(m.myPts),op=parseInt(m.oppPts);
+      totMy+=mp;totOpp+=op;
+      if(mp>op)totPts+=2;else if(mp===op)totPts+=1;
+    }
+  });
+  if(hasAny)html+=`<div class="card" style="border-color:var(--border2)">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:13px;color:var(--text2)">Team-Punkte</span>
+      <span style="font-size:24px;font-weight:600;font-family:var(--mono);color:var(--accent)">${totPts}/8</span>
+    </div>
+    <div style="font-size:12px;color:var(--text3);margin-top:4px;font-family:var(--mono)">Szenario: ${totMy}:${totOpp}</div>
   </div>`;
   document.getElementById('results-content').innerHTML=html;
 }
@@ -1768,213 +1779,215 @@ if(hasAny)html+=`<div class="card" style="border-color:var(--border2)">
 // AUSWERTUNG
 // ══════════════════════════════════════════════════════════════════
 function showAuswTab(id){
-document.querySelectorAll(’#panel-auswertung .view’).forEach(v=>v.classList.remove(‘active’));
-document.getElementById(‘ausw-’+id).classList.add(‘active’);
-document.querySelectorAll(’#panel-auswertung .stab’).forEach((t,i)=>
-t.classList.toggle(‘active’,[‘uebersicht’,‘matchups’][i]===id));
-if(id===‘uebersicht’)renderAuswUebersicht();
-if(id===‘matchups’)renderAuswMatchups();
+  document.querySelectorAll('#panel-auswertung .view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('ausw-'+id).classList.add('active');
+  document.querySelectorAll('#panel-auswertung .stab').forEach((t,i)=>
+    t.classList.toggle('active',['uebersicht','matchups'][i]===id));
+  if(id==='uebersicht')renderAuswUebersicht();
+  if(id==='matchups')renderAuswMatchups();
 }
 
 function renderAuswertung(){
-renderAuswUebersicht();
+  renderAuswUebersicht();
 }
 
 function renderAuswUebersicht(){
-const wrap=document.getElementById(‘eval-uebersicht’);
-let totalPts=0;let html=’’;
+  const wrap=document.getElementById('eval-uebersicht');
+  let totalPts=0;let html='';
 
-// Per-player stats: wins, upsets (won despite − or −−), badMatchups (played − or −−), bestDiff
-const pStats=G.players.map((_,pi)=>({wins:0,upsets:0,badMatchups:0,bestDiff:-999,bestDiffOpp:’’,sniper:0}));
+  // Per-player stats: wins, upsets (won despite − or −−), badMatchups (played − or −−), bestDiff
+  const pStats=G.players.map((_,pi)=>({wins:0,upsets:0,badMatchups:0,bestDiff:-999,bestDiffOpp:'',sniper:0}));
 
-G.rounds.forEach((r,ri)=>{
-if(!r.matchups.some(m=>m.myPts!==null))return;
-let rPts=0;let rMy=0;let rOpp=0;
-r.matchups.forEach((m,mi)=>{
-if(m.myPts===null)return;
-const mp=parseInt(m.myPts),op=parseInt(m.oppPts);
-rMy+=mp;rOpp+=op;
-if(mp>op)rPts+=2;else if(mp===op)rPts+=1;
+  G.rounds.forEach((r,ri)=>{
+    if(!r.matchups.some(m=>m.myPts!==null))return;
+    let rPts=0;let rMy=0;let rOpp=0;
+    r.matchups.forEach((m,mi)=>{
+      if(m.myPts===null)return;
+      const mp=parseInt(m.myPts),op=parseInt(m.oppPts);
+      rMy+=mp;rOpp+=op;
+      if(mp>op)rPts+=2;else if(mp===op)rPts+=1;
 
-```
-  // Player stats (slot mi = player mi)
-  const ps=pStats[mi];if(!ps)return;
-  const won=mp>op;
-  const diff=mp-op;
-  if(diff>ps.bestDiff){ps.bestDiff=diff;ps.bestDiffOpp=r.oppName||`R${ri+1}`;}
+      // Player stats (slot mi = player mi)
+      const ps=pStats[mi];if(!ps)return;
+      const won=mp>op;
+      const diff=mp-op;
+      if(diff>ps.bestDiff){ps.bestDiff=diff;ps.bestDiffOpp=r.oppName||`R${ri+1}`;}
 
-  // Matchup quality for this player's list in this round
-  const myListIdx=m.myList!==''?parseInt(m.myList):-1;
-  let expR=null;
-  if(myListIdx>=0&&G.selectedCombo){
-    const realLi=G.selectedCombo[myListIdx];
-    const ei=G.enemies.indexOf(m.oppList);
-    const ci=getActiveSzenarien().indexOf(r.scenario||'');
-    if(ei>=0&&ci>=0)expR=getR(realLi,ei,ci);
+      // Matchup quality for this player's list in this round
+      const myListIdx=m.myList!==''?parseInt(m.myList):-1;
+      let expR=null;
+      if(myListIdx>=0&&G.selectedCombo){
+        const realLi=G.selectedCombo[myListIdx];
+        const ei=G.enemies.indexOf(m.oppList);
+        const ci=getActiveSzenarien().indexOf(r.scenario||'');
+        if(ei>=0&&ci>=0)expR=getR(realLi,ei,ci);
+      }
+      const isBad=expR==='lu'||expR==='ku';
+      if(isBad)ps.badMatchups++;
+      if(won){
+        ps.wins++;
+        if(isBad)ps.upsets++;
+      }
+    });
+    totalPts+=rPts;
+    const oc=rPts>=6?'#4a8c10':rPts>=4?'#b08000':'#c00';
+    html+=`<div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="font-size:13px;font-weight:500">Runde ${ri+1}${r.oppName?' · '+r.oppName:''}</span>
+        <span style="font-size:20px;font-weight:600;font-family:var(--mono);color:${oc}">${rPts}/8</span>
+      </div>
+      <div style="font-size:12px;font-family:var(--mono);color:#888">${r.scenario||'–'} · ${rMy}:${rOpp}</div>
+    </div>`;
+  });
+
+  if(!html){wrap.innerHTML='<p class="hint">Noch keine Ergebnisse eingetragen.</p>';return;}
+
+  // Build achievements
+  const playedPlayers=G.players.map((p,i)=>({p,i,s:pStats[i]})).filter(x=>x.p.trim());
+  let achHTML='';
+
+  // 🏆 Carry – meiste Siege
+  const maxWins=Math.max(...playedPlayers.map(x=>x.s.wins));
+  if(maxWins>0){
+    const carries=playedPlayers.filter(x=>x.s.wins===maxWins);
+    achHTML+=achCard('🏆','Carry',carries.map(x=>x.p).join(', '),`${maxWins} Siege`,'#f0f8e0','#6ab820');
   }
-  const isBad=expR==='lu'||expR==='ku';
-  if(isBad)ps.badMatchups++;
-  if(won){
-    ps.wins++;
-    if(isBad)ps.upsets++;
+
+  // ⚡ Überraschung – meiste Siege trotz − oder −−
+  const maxUpsets=Math.max(...playedPlayers.map(x=>x.s.upsets));
+  if(maxUpsets>0){
+    const upsetters=playedPlayers.filter(x=>x.s.upsets===maxUpsets);
+    achHTML+=achCard('⚡','Überraschung',upsetters.map(x=>x.p).join(', '),`${maxUpsets}× Sieg trotz − oder −−`,'#fff8e0','#e0a020');
   }
-});
-totalPts+=rPts;
-const oc=rPts>=6?'#4a8c10':rPts>=4?'#b08000':'#c00';
-html+=`<div class="card">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-    <span style="font-size:13px;font-weight:500">Runde ${ri+1}${r.oppName?' · '+r.oppName:''}</span>
-    <span style="font-size:20px;font-weight:600;font-family:var(--mono);color:${oc}">${rPts}/8</span>
-  </div>
-  <div style="font-size:12px;font-family:var(--mono);color:#888">${r.scenario||'–'} · ${rMy}:${rOpp}</div>
-</div>`;
-```
 
-});
+  // 🐐 Sündenbock – meiste Spiele mit − oder −−
+  const maxBad=Math.max(...playedPlayers.map(x=>x.s.badMatchups));
+  if(maxBad>0){
+    const goats=playedPlayers.filter(x=>x.s.badMatchups===maxBad);
+    achHTML+=achCard('🐐','Sündenbock',goats.map(x=>x.p).join(', '),`${maxBad}× mit − oder −− gespielt`,'#fff0f0','#c04040');
+  }
 
-if(!html){wrap.innerHTML=’<p class="hint">Noch keine Ergebnisse eingetragen.</p>’;return;}
+  // 🎯 Sniper – höchste Punktedifferenz in einem Spiel
+  const maxDiff=Math.max(...playedPlayers.map(x=>x.s.bestDiff));
+  if(maxDiff>0){
+    const snipers=playedPlayers.filter(x=>x.s.bestDiff===maxDiff);
+    achHTML+=achCard('🎯','Sniper',snipers.map(x=>x.p).join(', '),`+${maxDiff} Pkt (vs ${snipers[0].s.bestDiffOpp})`,'#e8f0ff','#4060c0');
+  }
 
-// Build achievements
-const playedPlayers=G.players.map((p,i)=>({p,i,s:pStats[i]})).filter(x=>x.p.trim());
-let achHTML=’’;
+  // ⚔️ Duellant – häufigster Angreifer
+  const atkCounts=G.players.map((_,pi)=>0);
+  G.rounds.forEach(r=>{
+    if(r.attacker===''||r.attacker===undefined)return;
+    const atkListIdx=parseInt(r.attacker);
+    if(isNaN(atkListIdx)||!G.selectedCombo)return;
+    // attacker is a list index in selectedCombo; find which player owns it
+    const realLi=G.selectedCombo[atkListIdx];
+    const cand=G.candidates[realLi];
+    if(!cand||!cand.players.length)return;
+    cand.players.forEach(pi=>{if(pi<atkCounts.length)atkCounts[pi]++;});
+  });
+  const maxAtk=Math.max(...atkCounts);
+  if(maxAtk>0){
+    const duellants=G.players.map((p,i)=>({p,i})).filter(x=>x.p.trim()&&atkCounts[x.i]===maxAtk);
+    achHTML+=achCard('⚔️','Duellant',duellants.map(x=>x.p).join(', '),`${maxAtk}× als Angreifer`,'#f5f0ff','#8040c0');
+  }
 
-// 🏆 Carry – meiste Siege
-const maxWins=Math.max(…playedPlayers.map(x=>x.s.wins));
-if(maxWins>0){
-const carries=playedPlayers.filter(x=>x.s.wins===maxWins);
-achHTML+=achCard(‘🏆’,‘Carry’,carries.map(x=>x.p).join(’, ‘),`${maxWins} Siege`,’#f0f8e0’,’#6ab820’);
-}
+  // 🛡️ Held der Niederlage – engste Niederlage
+  let closestLoss=999;let closestLossPlayer='';let closestLossScore='';
+  G.rounds.forEach(r=>{
+    r.matchups.forEach((m,mi)=>{
+      if(m.myPts===null)return;
+      const mp=parseInt(m.myPts),op=parseInt(m.oppPts);
+      if(op>mp){
+        const gap=op-mp;
+        if(gap<closestLoss){closestLoss=gap;closestLossPlayer=G.players[mi]||`Spieler ${mi+1}`;closestLossScore=`${mp}:${op}`;}
+      }
+    });
+  });
+  if(closestLossPlayer){
+    achHTML+=achCard('🛡️','Held der Niederlage',closestLossPlayer,`Engste Niederlage ${closestLossScore}`,'#f0f5ff','#4080c0');
+  }
 
-// ⚡ Überraschung – meiste Siege trotz − oder −−
-const maxUpsets=Math.max(…playedPlayers.map(x=>x.s.upsets));
-if(maxUpsets>0){
-const upsetters=playedPlayers.filter(x=>x.s.upsets===maxUpsets);
-achHTML+=achCard(‘⚡’,‘Überraschung’,upsetters.map(x=>x.p).join(’, ‘),`${maxUpsets}× Sieg trotz − oder −−`,’#fff8e0’,’#e0a020’);
-}
-
-// 🐐 Sündenbock – meiste Spiele mit − oder −−
-const maxBad=Math.max(…playedPlayers.map(x=>x.s.badMatchups));
-if(maxBad>0){
-const goats=playedPlayers.filter(x=>x.s.badMatchups===maxBad);
-achHTML+=achCard(‘🐐’,‘Sündenbock’,goats.map(x=>x.p).join(’, ‘),`${maxBad}× mit − oder −− gespielt`,’#fff0f0’,’#c04040’);
-}
-
-// 🎯 Sniper – höchste Punktedifferenz in einem Spiel
-const maxDiff=Math.max(…playedPlayers.map(x=>x.s.bestDiff));
-if(maxDiff>0){
-const snipers=playedPlayers.filter(x=>x.s.bestDiff===maxDiff);
-achHTML+=achCard(‘🎯’,‘Sniper’,snipers.map(x=>x.p).join(’, ‘),`+${maxDiff} Pkt (vs ${snipers[0].s.bestDiffOpp})`,’#e8f0ff’,’#4060c0’);
-}
-
-// ⚔️ Duellant – häufigster Angreifer
-const atkCounts=G.players.map((_,pi)=>0);
-G.rounds.forEach(r=>{
-if(r.attacker===’’||r.attacker===undefined)return;
-const atkListIdx=parseInt(r.attacker);
-if(isNaN(atkListIdx)||!G.selectedCombo)return;
-// attacker is a list index in selectedCombo; find which player owns it
-const realLi=G.selectedCombo[atkListIdx];
-const cand=G.candidates[realLi];
-if(!cand||!cand.players.length)return;
-cand.players.forEach(pi=>{if(pi<atkCounts.length)atkCounts[pi]++;});
-});
-const maxAtk=Math.max(…atkCounts);
-if(maxAtk>0){
-const duellants=G.players.map((p,i)=>({p,i})).filter(x=>x.p.trim()&&atkCounts[x.i]===maxAtk);
-achHTML+=achCard(‘⚔️’,‘Duellant’,duellants.map(x=>x.p).join(’, ‘),`${maxAtk}× als Angreifer`,’#f5f0ff’,’#8040c0’);
-}
-
-// 🛡️ Held der Niederlage – engste Niederlage
-let closestLoss=999;let closestLossPlayer=’’;let closestLossScore=’’;
-G.rounds.forEach(r=>{
-r.matchups.forEach((m,mi)=>{
-if(m.myPts===null)return;
-const mp=parseInt(m.myPts),op=parseInt(m.oppPts);
-if(op>mp){
-const gap=op-mp;
-if(gap<closestLoss){closestLoss=gap;closestLossPlayer=G.players[mi]||`Spieler ${mi+1}`;closestLossScore=`${mp}:${op}`;}
-}
-});
-});
-if(closestLossPlayer){
-achHTML+=achCard(‘🛡️’,‘Held der Niederlage’,closestLossPlayer,`Engste Niederlage ${closestLossScore}`,’#f0f5ff’,’#4080c0’);
-}
-
-const ourName=G.teamName||‘Unser Team’;
-wrap.innerHTML=`<div class="card" style="border-color:#6ab820;background:#f4fbe8;margin-bottom:12px">
-
-<div style="display:flex;justify-content:space-between;align-items:center">
-<span style="font-size:15px;font-weight:600;color:#1a1a1a">${ourName}</span>
-<span style="font-size:28px;font-weight:600;font-family:var(--mono);color:#4a8c10">${totalPts} Pkt</span>
-</div>
-
+  const ourName=G.teamName||'Unser Team';
+  wrap.innerHTML=`<div class="card" style="border-color:#6ab820;background:#f4fbe8;margin-bottom:12px">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:15px;font-weight:600;color:#1a1a1a">${ourName}</span>
+      <span style="font-size:28px;font-weight:600;font-family:var(--mono);color:#4a8c10">${totalPts} Pkt</span>
+    </div>
   </div>`+(achHTML?`<div class="section-h">Achievements</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">${achHTML}</div>`:'')+html;
 }
 
 function achCard(emoji,title,name,sub,bg,border){
-return`<div style="background:${bg};border:1px solid ${border};border-radius:10px;padding:12px">
-
-<div style="font-size:22px;margin-bottom:4px">${emoji}</div>
-<div style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">${title}</div>
-<div style="font-size:14px;font-weight:600;color:#1a1a1a">${name}</div>
-<div style="font-size:11px;color:#888;margin-top:2px">${sub}</div>
-
+  return`<div style="background:${bg};border:1px solid ${border};border-radius:10px;padding:12px">
+    <div style="font-size:22px;margin-bottom:4px">${emoji}</div>
+    <div style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">${title}</div>
+    <div style="font-size:14px;font-weight:600;color:#1a1a1a">${name}</div>
+    <div style="font-size:11px;color:#888;margin-top:2px">${sub}</div>
   </div>`;
 }
 
 function renderAuswMatchups(){
-const wrap=document.getElementById(‘eval-matchups’);
-let diffSum=0;let total=0;let html=’’;
-const correct=diffSum; // alias for summary
-const myLists=G.selectedCombo?G.selectedCombo.map(i=>G.candidates[i]).filter(Boolean):[];
+  const wrap=document.getElementById('eval-matchups');
+  let diffSum=0;let total=0;let html='';
+  const correct=diffSum; // alias for summary
+  const myLists=G.selectedCombo?G.selectedCombo.map(i=>G.candidates[i]).filter(Boolean):[];
 
-G.rounds.forEach((r,ri)=>{
-if(!r.matchups.some(m=>m.myPts!==null))return;
-html+=`<div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin:16px 0 8px">Runde ${ri+1}${r.oppName?' · '+r.oppName:''}</div><div class="card">`;
-r.matchups.forEach((m,mi)=>{
-if(m.myPts===null||!m.myList)return;
-const mp=parseInt(m.myPts),op=parseInt(m.oppPts);
-const myListIdx=parseInt(m.myList);
-const realLi=G.selectedCombo?G.selectedCombo[myListIdx]:-1;
-const ei=G.enemies.indexOf(m.oppList);
-let expR=null;
-if(realLi>=0&&ei>=0){
-const ci=getActiveSzenarien().indexOf(r.scenario||’’);
-if(ci>=0)expR=getR(realLi,ei,ci);
-}
-let out=’’,oc=’#888’;
-if(mp>op){out=‘Sieg’;oc=’#4a8c10’;}else if(mp===op){out=‘Unentschieden’;oc=’#b08000’;}else{out=‘Niederlage’;oc=’#c00’;}
-let diff=null;
-if(expR){
-total++;
-const expPts=getPts(expR);
-const actPts=mp>op?2.0:mp===op?1.0:0.0;
-diff=actPts-expPts;
-diffSum+=diff;
-}
-const myName=myLists[myListIdx]?.name||’?’;
-const playerName=G.players[mi]||`Spieler ${mi+1}`;
-html+=`<div class="eval-row"> <div> <div style="font-size:12px;font-weight:600;color:#4a8c10;margin-bottom:2px">${playerName}</div> <div style="font-size:13px">${myName} vs ${m.oppList||'?'}</div> ${expR?`<div class="hint">Erwartet: <span class="chip chip-${expR}">${RATINGS.find(x=>x.val===expR)?.label}</span></div>`:'<div class="hint">Kein Matchup-Wert</div>'} </div> <div style="text-align:right;flex-shrink:0"> <div style="font-size:13px;font-weight:600;color:${oc}">${out}</div> <div style="font-size:11px;font-family:var(--mono);color:#888">${mp}:${op}</div> ${diff!==null?`<div style="font-size:11px;font-family:var(--mono);color:${diff>0?'#4a8c10':diff<0?'#c00':'#888'};font-weight:600">${diff>0?’+’:’’}${diff.toFixed(1)}</div>`:''} </div> </div>`;
-});
-html+=`</div>`;
-});
+  G.rounds.forEach((r,ri)=>{
+    if(!r.matchups.some(m=>m.myPts!==null))return;
+    html+=`<div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin:16px 0 8px">Runde ${ri+1}${r.oppName?' · '+r.oppName:''}</div><div class="card">`;
+    r.matchups.forEach((m,mi)=>{
+      if(m.myPts===null||!m.myList)return;
+      const mp=parseInt(m.myPts),op=parseInt(m.oppPts);
+      const myListIdx=parseInt(m.myList);
+      const realLi=G.selectedCombo?G.selectedCombo[myListIdx]:-1;
+      const ei=G.enemies.indexOf(m.oppList);
+      let expR=null;
+      if(realLi>=0&&ei>=0){
+        const ci=getActiveSzenarien().indexOf(r.scenario||'');
+        if(ci>=0)expR=getR(realLi,ei,ci);
+      }
+      let out='',oc='#888';
+      if(mp>op){out='Sieg';oc='#4a8c10';}else if(mp===op){out='Unentschieden';oc='#b08000';}else{out='Niederlage';oc='#c00';}
+      let diff=null;
+      if(expR){
+        total++;
+        const expPts=getPts(expR);
+        const actPts=mp>op?2.0:mp===op?1.0:0.0;
+        diff=actPts-expPts;
+        diffSum+=diff;
+      }
+      const myName=myLists[myListIdx]?.name||'?';
+      const playerName=G.players[mi]||`Spieler ${mi+1}`;
+      html+=`<div class="eval-row">
+        <div>
+          <div style="font-size:12px;font-weight:600;color:#4a8c10;margin-bottom:2px">${playerName}</div>
+          <div style="font-size:13px">${myName} vs ${m.oppList||'?'}</div>
+          ${expR?`<div class="hint">Erwartet: <span class="chip chip-${expR}">${RATINGS.find(x=>x.val===expR)?.label}</span></div>`:'<div class="hint">Kein Matchup-Wert</div>'}
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-size:13px;font-weight:600;color:${oc}">${out}</div>
+          <div style="font-size:11px;font-family:var(--mono);color:#888">${mp}:${op}</div>
+          ${diff!==null?`<div style="font-size:11px;font-family:var(--mono);color:${diff>0?'#4a8c10':diff<0?'#c00':'#888'};font-weight:600">${diff>0?'+':''}${diff.toFixed(1)}</div>`:''}
+        </div>
+      </div>`;
+    });
+    html+=`</div>`;
+  });
 
-if(!html){wrap.innerHTML=’<p class="hint">Noch keine Ergebnisse eingetragen.</p>’;return;}
-const avgDiff=total>0?diffSum/total:0;
-const summary=total>0?`<div class="card" style="margin-bottom:12px">
-
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-<div>
-<div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:.05em">Ø Abweichung</div>
-<div style="font-size:22px;font-weight:600;font-family:var(--mono);color:${avgDiff>=0?'#4a8c10':'#c00'};margin-top:4px">${avgDiff>=0?'+':''}${avgDiff.toFixed(2)}</div>
-</div>
-<div>
-<div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:.05em">Gesamt</div>
-<div style="font-size:22px;font-weight:600;font-family:var(--mono);color:${diffSum>=0?'#4a8c10':'#c00'};margin-top:4px">${diffSum>=0?'+':''}${diffSum.toFixed(1)}</div>
-</div>
-</div>
-<div style="font-size:11px;color:#888;margin-top:8px">${total} bewertete Matchups</div>
-
+  if(!html){wrap.innerHTML='<p class="hint">Noch keine Ergebnisse eingetragen.</p>';return;}
+  const avgDiff=total>0?diffSum/total:0;
+  const summary=total>0?`<div class="card" style="margin-bottom:12px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div>
+        <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:.05em">Ø Abweichung</div>
+        <div style="font-size:22px;font-weight:600;font-family:var(--mono);color:${avgDiff>=0?'#4a8c10':'#c00'};margin-top:4px">${avgDiff>=0?'+':''}${avgDiff.toFixed(2)}</div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:.05em">Gesamt</div>
+        <div style="font-size:22px;font-weight:600;font-family:var(--mono);color:${diffSum>=0?'#4a8c10':'#c00'};margin-top:4px">${diffSum>=0?'+':''}${diffSum.toFixed(1)}</div>
+      </div>
+    </div>
+    <div style="font-size:11px;color:#888;margin-top:8px">${total} bewertete Matchups</div>
   </div>`:'';
   wrap.innerHTML=summary+html;
 }
@@ -1983,118 +1996,118 @@ const summary=total>0?`<div class="card" style="margin-bottom:12px">
 // TESTDATEN
 // ══════════════════════════════════════════════════════════════════
 function loadTestData(){
-closeBurger();
-const td={
-players:[‘Anna’,‘Ben’,‘Clara’,‘David’],
-teamName:‘Die Grüne Flut’,
-candidates:[
-{name:‘Gondor’,players:[0]},
-{name:‘Rohan’,players:[1]},
-{name:‘Elfen’,players:[2]},
-{name:‘Zwerge’,players:[3]},
-{name:‘Armee des Todes’,players:[0,1]},
-{name:‘Ringgeister’,players:[2]},
-{name:‘Isengard’,players:[3]}
-],
-enemies:[‘Mordor’,‘Angmar’,‘Goblins’,‘Easterlins’,‘Harad’],
-scenarios:[‘Domination’,‘To the Death’,‘Hold Ground’],
-// matrix: key = li_ei_ci
-// li=0 Gondor, li=1 Rohan, li=2 Elfen, li=3 Zwerge, li=4 Armee des Todes
-// ei=0 Mordor, ei=1 Angmar, ei=2 Goblins, ei=3 Easterlins, ei=4 Harad
-// ci=0 Domination, ci=1 To the Death, ci=2 Hold Ground
-matrix:{
-‘0_0_0’:‘lf’,‘0_0_1’:‘kf’,‘0_0_2’:‘lf’,
-‘0_1_0’:‘50’,‘0_1_1’:‘lu’,‘0_1_2’:‘50’,
-‘0_2_0’:‘kf’,‘0_2_1’:‘lf’,‘0_2_2’:‘kf’,
-‘0_3_0’:‘lu’,‘0_3_1’:‘50’,‘0_3_2’:‘lu’,
-‘0_4_0’:‘50’,‘0_4_1’:‘lf’,‘0_4_2’:‘50’,
-‘1_0_0’:‘kf’,‘1_0_1’:‘kf’,‘1_0_2’:‘lf’,
-‘1_1_0’:‘lu’,‘1_1_1’:‘ku’,‘1_1_2’:‘lu’,
-‘1_2_0’:‘50’,‘1_2_1’:‘50’,‘1_2_2’:‘lf’,
-‘1_3_0’:‘lu’,‘1_3_1’:‘50’,‘1_3_2’:‘50’,
-‘1_4_0’:‘kf’,‘1_4_1’:‘lf’,‘1_4_2’:‘kf’,
-‘2_0_0’:‘kf’,‘2_0_1’:‘kf’,‘2_0_2’:‘kf’,
-‘2_1_0’:‘lf’,‘2_1_1’:‘50’,‘2_1_2’:‘lf’,
-‘2_2_0’:‘lu’,‘2_2_1’:‘lu’,‘2_2_2’:‘50’,
-‘2_3_0’:‘ku’,‘2_3_1’:‘lu’,‘2_3_2’:‘lu’,
-‘2_4_0’:‘50’,‘2_4_1’:‘50’,‘2_4_2’:‘lf’,
-‘3_0_0’:‘50’,‘3_0_1’:‘50’,‘3_0_2’:‘lf’,
-‘3_1_0’:‘kf’,‘3_1_1’:‘lf’,‘3_1_2’:‘50’,
-‘3_2_0’:‘lu’,‘3_2_1’:‘lu’,‘3_2_2’:‘50’,
-‘3_3_0’:‘lu’,‘3_3_1’:‘ku’,‘3_3_2’:‘lu’,
-‘3_4_0’:‘lf’,‘3_4_1’:‘50’,‘3_4_2’:‘lf’,
-‘4_0_0’:‘kf’,‘4_0_1’:‘kf’,‘4_0_2’:‘lf’,
-‘4_1_0’:‘lu’,‘4_1_1’:‘lu’,‘4_1_2’:‘50’,
-‘4_2_0’:‘50’,‘4_2_1’:‘50’,‘4_2_2’:‘lf’,
-‘4_3_0’:‘kf’,‘4_3_1’:‘50’,‘4_3_2’:‘lf’,
-‘4_4_0’:‘lu’,‘4_4_1’:‘ku’,‘4_4_2’:‘lu’
-},
-selectedCombo:[0,1,2,3,4],
-tourneyTeams:[],
-extraLists:[],
-extraMatrix:{},
-currentRound:2,
-rounds:[
-{
-scenario:‘Domination’,oppName:‘Team Sauron’,
-oppLists:[‘Mordor’,‘Angmar’,‘Goblins’,‘Easterlins’,‘Harad’],
-teamIdx:-1,oppStruck:‘Goblins’,myStruck:‘4’,oppAttacker:‘Mordor’,
-attacker:‘0’,pool:‘1’,defA:‘Mordor’,defB:‘Angmar’,mRatings:{},
-matchups:[
-{myList:‘0’,oppList:‘Mordor’,myPts:14,oppPts:8},
-{myList:‘1’,oppList:‘Angmar’,myPts:6,oppPts:12},
-{myList:‘2’,oppList:‘Harad’,myPts:12,oppPts:10},
-{myList:‘3’,oppList:‘Easterlins’,myPts:8,oppPts:8}
-]
-},
-{
-scenario:‘To the Death’,oppName:‘Team Saruman’,
-oppLists:[‘Goblins’,‘Easterlins’,‘Mordor’,‘Angmar’,‘Harad’],
-teamIdx:-1,oppStruck:‘Angmar’,myStruck:‘2’,oppAttacker:‘Easterlins’,
-attacker:‘1’,pool:‘0’,defA:‘Goblins’,defB:‘Easterlins’,mRatings:{},
-matchups:[
-{myList:‘0’,oppList:‘Goblins’,myPts:16,oppPts:6},
-{myList:‘1’,oppList:‘Easterlins’,myPts:8,oppPts:10},
-{myList:‘3’,oppList:‘Harad’,myPts:10,oppPts:10},
-{myList:‘4’,oppList:‘Mordor’,myPts:12,oppPts:8}
-]
-},
-{
-scenario:‘Hold Ground’,oppName:‘Team Gandalf’,
-oppLists:[‘Angmar’,‘Easterlins’,‘Goblins’,‘Mordor’,‘Harad’],
-teamIdx:-1,oppStruck:‘Goblins’,myStruck:‘0’,oppAttacker:‘Angmar’,
-attacker:‘1’,pool:‘3’,defA:‘Angmar’,defB:‘Easterlins’,mRatings:{},
-matchups:[
-{myList:‘1’,oppList:‘Angmar’,myPts:5,oppPts:14},
-{myList:‘2’,oppList:‘Easterlins’,myPts:11,oppPts:9},
-{myList:‘3’,oppList:‘Mordor’,myPts:10,oppPts:10},
-{myList:‘4’,oppList:‘Harad’,myPts:14,oppPts:7}
-]
-},
-{scenario:’’,oppName:’’,oppLists:[’’,’’,’’,’’,’’],teamIdx:-1,oppStruck:’’,myStruck:’’,oppAttacker:’’,attacker:’’,pool:’’,defA:’’,defB:’’,mRatings:{},matchups:[{myList:’’,oppList:’’,myPts:null,oppPts:null},{myList:’’,oppList:’’,myPts:null,oppPts:null},{myList:’’,oppList:’’,myPts:null,oppPts:null},{myList:’’,oppList:’’,myPts:null,oppPts:null}]},
-{scenario:’’,oppName:’’,oppLists:[’’,’’,’’,’’,’’],teamIdx:-1,oppStruck:’’,myStruck:’’,oppAttacker:’’,attacker:’’,pool:’’,defA:’’,defB:’’,mRatings:{},matchups:[{myList:’’,oppList:’’,myPts:null,oppPts:null},{myList:’’,oppList:’’,myPts:null,oppPts:null},{myList:’’,oppList:’’,myPts:null,oppPts:null},{myList:’’,oppList:’’,myPts:null,oppPts:null}]}
-]
-};
-localStorage.setItem(SK,JSON.stringify(td));
-Object.assign(G,td);
-renderPlayers();
-renderCandidates();
-renderEnemies();
-renderMatrixTabs();
-renderExtraMatrix();
-renderTourneyTeams();
-setMode(‘auswertung’);
+  closeBurger();
+  const td={
+    players:['Anna','Ben','Clara','David'],
+    teamName:'Die Grüne Flut',
+    candidates:[
+      {name:'Gondor',players:[0]},
+      {name:'Rohan',players:[1]},
+      {name:'Elfen',players:[2]},
+      {name:'Zwerge',players:[3]},
+      {name:'Armee des Todes',players:[0,1]},
+      {name:'Ringgeister',players:[2]},
+      {name:'Isengard',players:[3]}
+    ],
+    enemies:['Mordor','Angmar','Goblins','Easterlins','Harad'],
+    scenarios:['Domination','To the Death','Hold Ground'],
+    // matrix: key = li_ei_ci
+    // li=0 Gondor, li=1 Rohan, li=2 Elfen, li=3 Zwerge, li=4 Armee des Todes
+    // ei=0 Mordor, ei=1 Angmar, ei=2 Goblins, ei=3 Easterlins, ei=4 Harad
+    // ci=0 Domination, ci=1 To the Death, ci=2 Hold Ground
+    matrix:{
+      '0_0_0':'lf','0_0_1':'kf','0_0_2':'lf',
+      '0_1_0':'50','0_1_1':'lu','0_1_2':'50',
+      '0_2_0':'kf','0_2_1':'lf','0_2_2':'kf',
+      '0_3_0':'lu','0_3_1':'50','0_3_2':'lu',
+      '0_4_0':'50','0_4_1':'lf','0_4_2':'50',
+      '1_0_0':'kf','1_0_1':'kf','1_0_2':'lf',
+      '1_1_0':'lu','1_1_1':'ku','1_1_2':'lu',
+      '1_2_0':'50','1_2_1':'50','1_2_2':'lf',
+      '1_3_0':'lu','1_3_1':'50','1_3_2':'50',
+      '1_4_0':'kf','1_4_1':'lf','1_4_2':'kf',
+      '2_0_0':'kf','2_0_1':'kf','2_0_2':'kf',
+      '2_1_0':'lf','2_1_1':'50','2_1_2':'lf',
+      '2_2_0':'lu','2_2_1':'lu','2_2_2':'50',
+      '2_3_0':'ku','2_3_1':'lu','2_3_2':'lu',
+      '2_4_0':'50','2_4_1':'50','2_4_2':'lf',
+      '3_0_0':'50','3_0_1':'50','3_0_2':'lf',
+      '3_1_0':'kf','3_1_1':'lf','3_1_2':'50',
+      '3_2_0':'lu','3_2_1':'lu','3_2_2':'50',
+      '3_3_0':'lu','3_3_1':'ku','3_3_2':'lu',
+      '3_4_0':'lf','3_4_1':'50','3_4_2':'lf',
+      '4_0_0':'kf','4_0_1':'kf','4_0_2':'lf',
+      '4_1_0':'lu','4_1_1':'lu','4_1_2':'50',
+      '4_2_0':'50','4_2_1':'50','4_2_2':'lf',
+      '4_3_0':'kf','4_3_1':'50','4_3_2':'lf',
+      '4_4_0':'lu','4_4_1':'ku','4_4_2':'lu'
+    },
+    selectedCombo:[0,1,2,3,4],
+    tourneyTeams:[],
+    extraLists:[],
+    extraMatrix:{},
+    currentRound:2,
+    rounds:[
+      {
+        scenario:'Domination',oppName:'Team Sauron',
+        oppLists:['Mordor','Angmar','Goblins','Easterlins','Harad'],
+        teamIdx:-1,oppStruck:'Goblins',myStruck:'4',oppAttacker:'Mordor',
+        attacker:'0',pool:'1',defA:'Mordor',defB:'Angmar',mRatings:{},
+        matchups:[
+          {myList:'0',oppList:'Mordor',myPts:14,oppPts:8},
+          {myList:'1',oppList:'Angmar',myPts:6,oppPts:12},
+          {myList:'2',oppList:'Harad',myPts:12,oppPts:10},
+          {myList:'3',oppList:'Easterlins',myPts:8,oppPts:8}
+        ]
+      },
+      {
+        scenario:'To the Death',oppName:'Team Saruman',
+        oppLists:['Goblins','Easterlins','Mordor','Angmar','Harad'],
+        teamIdx:-1,oppStruck:'Angmar',myStruck:'2',oppAttacker:'Easterlins',
+        attacker:'1',pool:'0',defA:'Goblins',defB:'Easterlins',mRatings:{},
+        matchups:[
+          {myList:'0',oppList:'Goblins',myPts:16,oppPts:6},
+          {myList:'1',oppList:'Easterlins',myPts:8,oppPts:10},
+          {myList:'3',oppList:'Harad',myPts:10,oppPts:10},
+          {myList:'4',oppList:'Mordor',myPts:12,oppPts:8}
+        ]
+      },
+      {
+        scenario:'Hold Ground',oppName:'Team Gandalf',
+        oppLists:['Angmar','Easterlins','Goblins','Mordor','Harad'],
+        teamIdx:-1,oppStruck:'Goblins',myStruck:'0',oppAttacker:'Angmar',
+        attacker:'1',pool:'3',defA:'Angmar',defB:'Easterlins',mRatings:{},
+        matchups:[
+          {myList:'1',oppList:'Angmar',myPts:5,oppPts:14},
+          {myList:'2',oppList:'Easterlins',myPts:11,oppPts:9},
+          {myList:'3',oppList:'Mordor',myPts:10,oppPts:10},
+          {myList:'4',oppList:'Harad',myPts:14,oppPts:7}
+        ]
+      },
+      {scenario:'',oppName:'',oppLists:['','','','',''],teamIdx:-1,oppStruck:'',myStruck:'',oppAttacker:'',attacker:'',pool:'',defA:'',defB:'',mRatings:{},matchups:[{myList:'',oppList:'',myPts:null,oppPts:null},{myList:'',oppList:'',myPts:null,oppPts:null},{myList:'',oppList:'',myPts:null,oppPts:null},{myList:'',oppList:'',myPts:null,oppPts:null}]},
+      {scenario:'',oppName:'',oppLists:['','','','',''],teamIdx:-1,oppStruck:'',myStruck:'',oppAttacker:'',attacker:'',pool:'',defA:'',defB:'',mRatings:{},matchups:[{myList:'',oppList:'',myPts:null,oppPts:null},{myList:'',oppList:'',myPts:null,oppPts:null},{myList:'',oppList:'',myPts:null,oppPts:null},{myList:'',oppList:'',myPts:null,oppPts:null}]}
+    ]
+  };
+  localStorage.setItem(SK,JSON.stringify(td));
+  Object.assign(G,td);
+  renderPlayers();
+  renderCandidates();
+  renderEnemies();
+  renderMatrixTabs();
+  renderExtraMatrix();
+  renderTourneyTeams();
+  setMode('auswertung');
 }
 
 // ══════════════════════════════════════════════════════════════════
 // INIT
 // ══════════════════════════════════════════════════════════════════
-try{load();}catch(e){console.error(‘load’,e);}
-try{renderPlayers();}catch(e){console.error(‘renderPlayers’,e);}
-try{renderCandidates();}catch(e){console.error(‘renderCandidates’,e);}
-try{renderEnemies();}catch(e){console.error(‘renderEnemies’,e);}
-try{renderMatrixTabs();}catch(e){console.error(‘renderMatrixTabs’,e);}
-document.getElementById(‘round-badge-wrap’).style.display=‘none’;
+load();
+renderPlayers();
+renderCandidates();
+renderEnemies();
+renderMatrixTabs();
+document.getElementById('round-badge-wrap').style.display='none';
 </script>
 
 </body>
