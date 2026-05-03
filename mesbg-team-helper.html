@@ -1019,6 +1019,7 @@ html+=`<div class="combo-card${isPicked?' picked':''}" onclick="pickCombo(${JSON
 });
 // Legend
 html+=`<div class="card" style="margin-top:16px">
+
 <div class="card-title">Legende · Score-Berechnung</div>
 <div style="font-size:12px;color:#555;line-height:1.8;margin-bottom:12px">
 Der Score bewertet wie <strong>verlässlich</strong> eine Kombi über alle Szenarien funktioniert – nicht wie stark sie in einzelnen glänzt.
@@ -1092,23 +1093,24 @@ wrap.innerHTML=G.tourneyTeams.map((team,ti)=>{
 const isOpen=team.open||false;
 const lists=team.lists.map(l=>getTTName(l)).filter(l=>l.trim());
 return`<div class="combo-card" style="margin-bottom:10px"> <div style="display:flex;gap:8px;align-items:center"> <input type="text" value="${team.name}" placeholder="Teamname..." style="flex:1;font-weight:600;font-size:14px;background:none;border:none;border-bottom:1px solid #ddd;border-radius:0;padding:4px 0" oninput="G.tourneyTeams[${ti}].name=this.value;save()"> <button class="btn btn-sm btn-danger" onclick="G.tourneyTeams.splice(${ti},1);save();renderTourneyTeams()">×</button> </div> <div style="display:flex;flex-wrap:wrap;gap:4px;margin:8px 0"> ${lists.length?lists.map(l=>`<span class="tag">${l}</span>`).join(''):'<span class="hint">Noch keine Listen</span>'} </div> <div style="display:${isOpen?'block':'none'}"> <div class="divider"></div> <div class="label" style="margin-bottom:8px">5 Listen</div> ${team.lists.map((l,li)=>`
+
 <div style="margin-bottom:8px">
-<select onchange="onTTListChange(${ti},${li},this.value)">${getMetaOpts(l.type===‘extra’?`extra:${l.val}`:`meta:${l.val}`)}</select>
+<select onchange="onTTListChange(${ti},${li},this.value)">${getMetaOpts(l.type==='extra'?`extra:${l.val}`:`meta:${l.val}`)}</select>
 </div>`).join('')} <div style="display:flex;gap:6px;margin-bottom:12px;align-items:center"> <input type="text" id="new-extra-input-${ti}" placeholder="Neue Liste anlegen…" style="flex:1"> <button class="btn btn-sm btn-primary" onclick="confirmAddExtraList(${ti})">+</button> </div> <div class="divider"></div> <div class="label" style="margin-bottom:6px">Matchup-Einschätzungen</div> <div id="tt-mx-${ti}"></div> </div> <div style="text-align:center;margin-top:8px"> <button onclick="toggleTT(${ti})" style="background:none;border:none;cursor:pointer;font-size:18px;color:#888;padding:4px 16px">${isOpen?'▴':'▾'}</button> </div> </div>`;
-}).join(’’);
+}).join('');
 G.tourneyTeams.forEach((*,ti)=>{if(G.tourneyTeams[ti].open)renderTTMx(ti);});
 }
 function renderTTMx(ti){
 const wrap=document.getElementById(`tt-mx-${ti}`);if(!wrap)return;
 const team=G.tourneyTeams[ti];
 const validOpp=team.lists.map(l=>getTTName(l)).filter(l=>l.trim());
-if(!validOpp.length||!G.selectedCombo){wrap.innerHTML=’<p class="hint">Erst finale 5 in Phase 4 wählen.</p>’;return;}
+if(!validOpp.length||!G.selectedCombo){wrap.innerHTML='<p class="hint">Erst finale 5 in Phase 4 wählen.</p>';return;}
 const myLists=G.selectedCombo.map(i=>G.candidates[i]).filter(Boolean);
 const sc=getActiveSzenarien();
-if(!sc.length){wrap.innerHTML=’<p class="hint">Erst Szenarien in Phase 3 wählen.</p>’;return;}
-let html=’<div class="matrix-wrap"><table class="matrix-table"><thead><tr><th class="rh">Unsere Liste</th>’;
+if(!sc.length){wrap.innerHTML='<p class="hint">Erst Szenarien in Phase 3 wählen.</p>';return;}
+let html='<div class="matrix-wrap"><table class="matrix-table"><thead><tr><th class="rh">Unsere Liste</th>';
 sc.forEach(s=>html+=`<th style="min-width:60px">${s.length>8?s.slice(0,7)+'…':s}</th>`);
-html+=’</tr></thead><tbody>’;
+html+='</tr></thead><tbody>';
 myLists.forEach((myC,mli)=>{
 const li=G.candidates.indexOf(myC);
 validOpp.forEach((tl,tli)=>{
@@ -1119,25 +1121,25 @@ const isExtra=G.extraLists&&G.extraLists.includes(tl);
 if(known){
 const v=getR(li,ei,ci);
 const key=`${li}_${ei}_${ci}`;
-html+=`<td>${rSel(`ttmeta_${ti}*${mli}*${ei}*${ci}`,v,`G.matrix[’${key}’]=this.value;save()`)}</td>`;
+html+=`<td>${rSel(`ttmeta_${ti}*${mli}*${ei}*${ci}`,v,`G.matrix['${key}']=this.value;save()`)}</td>`;
 } else if(isExtra){
 const xi=(G.extraLists||[]).indexOf(tl);
 if(!G.extraMatrix)G.extraMatrix={};
 const key=`${li}_${xi}_${ci}`;
-const v=G.extraMatrix[key]||’’;
+const v=G.extraMatrix[key]||'';
 html+=`<td>${rSel(`ttex*${ti}*${mli}*${xi}*${ci}`,v,`updExtraMatrix(${li},${xi},${ci},this.value)`)}</td>`;
 } else {
 if(!team.ratings)team.ratings={};
 if(!team.ratings[myC.name])team.ratings[myC.name]={};
-if(!team.ratings[myC.name][tl])team.ratings[myC.name][tl]=Array(sc.length).fill(’’);
-const v=team.ratings[myC.name][tl][ci]||’’;
-html+=`<td>${rSel(`tt*${ti}*${mli}*${tli}*${ci}`,v,`updTTR(${ti},’${myC.name}’,’${tl}’,${ci},this.value)`)}</td>`;
+if(!team.ratings[myC.name][tl])team.ratings[myC.name][tl]=Array(sc.length).fill('');
+const v=team.ratings[myC.name][tl][ci]||'';
+html+=`<td>${rSel(`tt*${ti}*${mli}*${tli}*${ci}`,v,`updTTR(${ti},'${myC.name}','${tl}',${ci},this.value)`)}</td>`;
 }
 });
-html+=’</tr>’;
+html+='</tr>';
 });
 });
-html+=’</tbody></table></div>’;wrap.innerHTML=html;
+html+='</tbody></table></div>';wrap.innerHTML=html;
 }
 function updTTR(ti,ml,el,ci,val){
 // check if el is a meta enemy
@@ -1151,46 +1153,46 @@ if(xi>=0&&li>=0){if(!G.extraMatrix)G.extraMatrix={};G.extraMatrix[`${li}_${xi}_$
 if(!G.tourneyTeams[ti].ratings)G.tourneyTeams[ti].ratings={};
 if(!G.tourneyTeams[ti].ratings[ml])G.tourneyTeams[ti].ratings[ml]={};
 const sc=getActiveSzenarien();
-if(!G.tourneyTeams[ti].ratings[ml][el])G.tourneyTeams[ti].ratings[ml][el]=Array(sc.length).fill(’’);
+if(!G.tourneyTeams[ti].ratings[ml][el])G.tourneyTeams[ti].ratings[ml][el]=Array(sc.length).fill('');
 G.tourneyTeams[ti].ratings[ml][el][ci]=val;
 save();
 }
 function updExtraMatrix(li,xi,ci,val){
 if(!G.extraMatrix)G.extraMatrix={};
 G.extraMatrix[`${li}_${xi}_${ci}`]=val;
-save(); // just save, don’t re-render
+save(); // just save, don't re-render
 }
 let extraMatrixTab=0;
 function renderExtraMatrix(){
-const wrap=document.getElementById(‘extra-matrix-wrap’);
+const wrap=document.getElementById('extra-matrix-wrap');
 if(!wrap)return;
 const extraLists=(G.extraLists||[]).filter(e=>e.trim());
 const sc=getActiveSzenarien();
 const vc=getVC();
 if(!extraLists.length){
-wrap.innerHTML=’<p class="hint">Noch keine Extra-Listen. Beim Anlegen in Turnier-Teams automatisch gespeichert.</p>’;return;
+wrap.innerHTML='<p class="hint">Noch keine Extra-Listen. Beim Anlegen in Turnier-Teams automatisch gespeichert.</p>';return;
 }
-if(!vc.length||!sc.length){wrap.innerHTML=’<p class="hint">Erst Listen und Szenarien definieren.</p>’;return;}
+if(!vc.length||!sc.length){wrap.innerHTML='<p class="hint">Erst Listen und Szenarien definieren.</p>';return;}
 const myLists=G.selectedCombo?G.selectedCombo.map(i=>G.candidates[i]).filter(Boolean):vc;
 if(extraMatrixTab>=myLists.length)extraMatrixTab=0;
-let html=’<div class="inner-tabs">’;
+let html='<div class="inner-tabs">';
 myLists.forEach((c,ti)=>html+=`<div class="inner-tab${ti===extraMatrixTab?' active':''}" onclick="extraMatrixTab=${ti};renderExtraMatrix()">${c.name}</div>`);
-html+=’</div>’;
+html+='</div>';
 const myC=myLists[extraMatrixTab];
 const li=G.candidates.indexOf(myC);
-html+=’<div class="matrix-wrap"><table class="matrix-table"><thead><tr><th class="rh">Extra-Liste</th>’;
+html+='<div class="matrix-wrap"><table class="matrix-table"><thead><tr><th class="rh">Extra-Liste</th>';
 sc.forEach(s=>html+=`<th style="min-width:80px">${s.length>8?s.slice(0,7)+'…':s}</th>`);
-html+=’</tr></thead><tbody>’;
+html+='</tr></thead><tbody>';
 extraLists.forEach((extra,xi)=>{
 html+=`<tr><td style="font-size:12px;padding:6px 4px;color:#555;white-space:nowrap"> <div style="display:flex;align-items:center;gap:4px"> ${extra} <button onclick="removeExtraList(${xi})" style="background:none;border:none;color:#ccc;cursor:pointer;font-size:11px;flex-shrink:0">×</button> </div> </td>`;
 sc.forEach((*,ci)=>{
 const key=`${li}_${xi}_${ci}`;
-const val=(G.extraMatrix||{})[key]||’’;
+const val=(G.extraMatrix||{})[key]||'';
 html+=`<td>${rSel(`exmx_${li}*${xi}*${ci}`,val,`updExtraMatrix(${li},${xi},${ci},this.value)`)}</td>`;
 });
-html+=’</tr>’;
+html+='</tr>';
 });
-html+=’</tbody></table></div>’;
+html+='</tbody></table></div>';
 wrap.innerHTML=html;
 }
 function removeExtraList(xi){
@@ -1198,7 +1200,7 @@ const name=G.extraLists[xi];
 // clean extraMatrix
 const newMatrix={};
 Object.keys(G.extraMatrix||{}).forEach(key=>{
-const parts=key.split(’_’);
+const parts=key.split('_');
 const li=parseInt(parts[0]),eiN=parseInt(parts[1]),ci=parseInt(parts[2]);
 if(eiN===xi)return;
 if(eiN>xi)newMatrix[`${li}_${eiN-1}_${ci}`]=G.extraMatrix[key];
@@ -1208,7 +1210,7 @@ G.extraMatrix=newMatrix;
 // clean team entries pointing to this extra list
 G.tourneyTeams.forEach(team=>{
 team.lists=team.lists.map(l=>
-l.type===‘extra’&&l.val===name?{type:‘meta’,val:’’,manual:’’}:l
+l.type==='extra'&&l.val===name?{type:'meta',val:'',manual:''}:l
 );
 });
 G.extraLists.splice(xi,1);
@@ -1751,6 +1753,7 @@ if(mp>op)totPts+=2;else if(mp===op)totPts+=1;
 }
 });
 if(hasAny)html+=`<div class="card" style="border-color:var(--border2)">
+
 <div style="display:flex;justify-content:space-between;align-items:center">
 <span style="font-size:13px;color:var(--text2)">Team-Punkte</span>
 <span style="font-size:24px;font-weight:600;font-family:var(--mono);color:var(--accent)">${totPts}/8</span>
@@ -1899,6 +1902,7 @@ achHTML+=achCard(‘🛡️’,‘Held der Niederlage’,closestLossPlayer,`Engs
 
 const ourName=G.teamName||‘Unser Team’;
 wrap.innerHTML=`<div class="card" style="border-color:#6ab820;background:#f4fbe8;margin-bottom:12px">
+
 <div style="display:flex;justify-content:space-between;align-items:center">
 <span style="font-size:15px;font-weight:600;color:#1a1a1a">${ourName}</span>
 <span style="font-size:28px;font-weight:600;font-family:var(--mono);color:#4a8c10">${totalPts} Pkt</span>
@@ -1909,6 +1913,7 @@ wrap.innerHTML=`<div class="card" style="border-color:#6ab820;background:#f4fbe8
 
 function achCard(emoji,title,name,sub,bg,border){
 return`<div style="background:${bg};border:1px solid ${border};border-radius:10px;padding:12px">
+
 <div style="font-size:22px;margin-bottom:4px">${emoji}</div>
 <div style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">${title}</div>
 <div style="font-size:14px;font-weight:600;color:#1a1a1a">${name}</div>
@@ -1957,14 +1962,15 @@ html+=`</div>`;
 if(!html){wrap.innerHTML=’<p class="hint">Noch keine Ergebnisse eingetragen.</p>’;return;}
 const avgDiff=total>0?diffSum/total:0;
 const summary=total>0?`<div class="card" style="margin-bottom:12px">
+
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
 <div>
 <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:.05em">Ø Abweichung</div>
-<div style="font-size:22px;font-weight:600;font-family:var(--mono);color:${avgDiff>=0?'#4a8c10':'#c00'};margin-top:4px">${avgDiff>=0?’+’:’’}${avgDiff.toFixed(2)}</div>
+<div style="font-size:22px;font-weight:600;font-family:var(--mono);color:${avgDiff>=0?'#4a8c10':'#c00'};margin-top:4px">${avgDiff>=0?'+':''}${avgDiff.toFixed(2)}</div>
 </div>
 <div>
 <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:.05em">Gesamt</div>
-<div style="font-size:22px;font-weight:600;font-family:var(--mono);color:${diffSum>=0?'#4a8c10':'#c00'};margin-top:4px">${diffSum>=0?’+’:’’}${diffSum.toFixed(1)}</div>
+<div style="font-size:22px;font-weight:600;font-family:var(--mono);color:${diffSum>=0?'#4a8c10':'#c00'};margin-top:4px">${diffSum>=0?'+':''}${diffSum.toFixed(1)}</div>
 </div>
 </div>
 <div style="font-size:11px;color:#888;margin-top:8px">${total} bewertete Matchups</div>
@@ -2083,11 +2089,11 @@ setMode(‘auswertung’);
 // ══════════════════════════════════════════════════════════════════
 // INIT
 // ══════════════════════════════════════════════════════════════════
-load();
-renderPlayers();
-renderCandidates();
-renderEnemies();
-renderMatrixTabs();
+try{load();}catch(e){console.error(‘load’,e);}
+try{renderPlayers();}catch(e){console.error(‘renderPlayers’,e);}
+try{renderCandidates();}catch(e){console.error(‘renderCandidates’,e);}
+try{renderEnemies();}catch(e){console.error(‘renderEnemies’,e);}
+try{renderMatrixTabs();}catch(e){console.error(‘renderMatrixTabs’,e);}
 document.getElementById(‘round-badge-wrap’).style.display=‘none’;
 </script>
 
