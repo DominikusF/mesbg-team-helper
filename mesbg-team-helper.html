@@ -452,10 +452,8 @@ function subscribeRealtime(turnierId){
         const newExtraMatrix=Object.assign({},remote.extraMatrix||{});
         _dirtyExtraMatrixKeys.forEach(k=>{newExtraMatrix[k]=G.extraMatrix[k];});
         const preserveRound=G.currentRound;
-        const preserveRounds=G.rounds;
         Object.assign(G,remote);
         G.currentRound=preserveRound;
-        G.rounds=preserveRounds;
         G.matrix=newMatrix;
         G.extraMatrix=newExtraMatrix;
         saveLocal();
