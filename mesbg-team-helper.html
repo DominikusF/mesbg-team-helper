@@ -464,6 +464,12 @@ function subscribeRealtime(turnierId){
         renderScenarios();
         if(currentPhaseIdx===4)renderPortfolio();
         if(currentPhaseIdx===5)renderTourneyTeams();
+        if(currentMode==='turnier'){
+          renderTeamSelect();
+          renderStrike();
+          renderAttack();
+          renderResults();
+        }
       })
     .subscribe();
 }
