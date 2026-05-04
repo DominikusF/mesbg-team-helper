@@ -138,7 +138,6 @@ select:focus{outline:none;border-color:#6ab820}
 .section-h{font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.1em;margin:20px 0 10px}
 .eval-row{display:flex;align-items:flex-start;justify-content:space-between;padding:10px 0;border-bottom:1px solid #eee;gap:8px}
 .export-code{background:#f5f4f0;border:1px solid #ccc;border-radius:6px;padding:12px;font-family:var(–mono);font-size:10px;word-break:break-all;max-height:120px;overflow-y:auto;margin-top:10px;color:#555}
-textarea.import-area{min-height:80px;font-size:13px;font-family:var(–mono)}
 </style>
 
 </head>
@@ -178,9 +177,6 @@ textarea.import-area{min-height:80px;font-size:13px;font-family:var(–mono)}
     <div class="burger-menu" id="burger-menu">
       <div class="bmenu-item" onclick="showTurnierOverlay()">📋 Turniere</div>
       <div class="bmenu-item" onclick="copyTurnierLink()">🔗 Link kopieren</div>
-      <div class="bmenu-item" onclick="doFullExport()">↑ Exportieren</div>
-      <div class="bmenu-item" onclick="showImportPanel()">↓ Importieren</div>
-      <div class="bmenu-item" onclick="loadTestData()">🧪 Testdaten laden</div>
       <div class="bmenu-item danger" onclick="confirmReset()">⚠ Reset</div>
     </div>
   </div>
@@ -422,19 +418,6 @@ textarea.import-area{min-height:80px;font-size:13px;font-family:var(–mono)}
   </div>
 </div>
 
-<div id="import-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:500;padding:24px;align-items:center;justify-content:center">
-  <div class="card" style="max-width:480px;width:100%;margin:0 auto">
-    <div class="card-title">Importieren</div>
-    <div class="hint" style="margin-bottom:10px">Backup-Code einfügen. Achtung: überschreibt alle aktuellen Daten.</div>
-    <textarea class="import-area" id="import-code" placeholder="Code hier einfügen..."></textarea>
-    <div style="display:flex;gap:8px;margin-top:12px">
-      <button class="btn btn-primary" onclick="doImport()">Importieren</button>
-      <button class="btn" onclick="closeImport()">Abbrechen</button>
-    </div>
-    <div id="import-status"></div>
-  </div>
-</div>
-
 <script>
 // ══════════════════════════════════════════════════════════════════
 // CONSTANTS
@@ -579,31 +562,6 @@ function confirmReset(){
     location.hash='';
     location.reload();
   }
-}
-
-function doFullExport(){
-  closeBurger();
-  const b64=btoa(unescape(encodeURIComponent(JSON.stringify(G))));
-  const el=document.createElement('textarea');
-  el.value=b64;el.style.position='fixed';el.style.opacity='0';
-  document.body.appendChild(el);el.select();
-  document.execCommand('copy');document.body.removeChild(el);
-  navigator.clipboard?.writeText(b64);
-  alert('Export-Code in Zwischenablage kopiert!');
-}
-
-function showImportPanel(){closeBurger();document.getElementById('import-overlay').style.display='flex';}
-function closeImport(){document.getElementById('import-overlay').style.display='none';}
-
-function doImport(){
-  const code=document.getElementById('import-code').value.trim();
-  const status=document.getElementById('import-status');
-  try{
-    const d=JSON.parse(decodeURIComponent(escape(atob(code))));
-    Object.assign(G,d);save();
-    status.innerHTML='<div class="box-ok">Importiert ✓</div>';
-    setTimeout(()=>{closeImport();location.reload();},800);
-  }catch(e){status.innerHTML='<div class="box-err">Ungültiger Code.</div>';}
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -2273,190 +2231,6 @@ function renderAuswMatchups(){
   wrap.innerHTML=summary+html;
 }
 
-// ══════════════════════════════════════════════════════════════════
-// TESTDATEN
-// ══════════════════════════════════════════════════════════════════
-function loadTestData(){
-  closeBurger();
-  const td={
-    players:['Anna','Ben','Clara','David'],
-    teamName:'Die Grüne Flut',
-    candidates:[
-      {name:'Gondor',players:[0]},
-      {name:'Rohan',players:[1]},
-      {name:'Elfen',players:[2]},
-      {name:'Zwerge',players:[3]},
-      {name:'Armee des Todes',players:[0,1]},
-      {name:'Ringgeister',players:[2]},
-      {name:'Isengard',players:[3]}
-    ],
-    enemies:['Mordor','Angmar','Goblins','Easterlins','Harad'],
-    extraLists:['Rivendell','Umbar'],
-    scenarios:['Domination','To the Death','Hold Ground','Reconnoitre','Fog of War','Clash by Moonlight'],
-    // li=0 Gondor, li=1 Rohan, li=2 Elfen, li=3 Zwerge, li=4 Armee des Todes
-    // ei=0 Mordor, ei=1 Angmar, ei=2 Goblins, ei=3 Easterlins, ei=4 Harad
-    // ci=0..5 Szenarien
-    matrix:{
-      '0_0_0':'lf','0_0_1':'kf','0_0_2':'lf','0_0_3':'50','0_0_4':'lf','0_0_5':'50',
-      '0_1_0':'50','0_1_1':'lu','0_1_2':'50','0_1_3':'lu','0_1_4':'50','0_1_5':'lu',
-      '0_2_0':'kf','0_2_1':'lf','0_2_2':'kf','0_2_3':'lf','0_2_4':'kf','0_2_5':'lf',
-      '0_3_0':'lu','0_3_1':'50','0_3_2':'lu','0_3_3':'50','0_3_4':'lu','0_3_5':'50',
-      '0_4_0':'50','0_4_1':'lf','0_4_2':'50','0_4_3':'lf','0_4_4':'50','0_4_5':'lf',
-      '1_0_0':'kf','1_0_1':'kf','1_0_2':'lf','1_0_3':'kf','1_0_4':'lf','1_0_5':'kf',
-      '1_1_0':'lu','1_1_1':'ku','1_1_2':'lu','1_1_3':'ku','1_1_4':'lu','1_1_5':'50',
-      '1_2_0':'50','1_2_1':'50','1_2_2':'lf','1_2_3':'50','1_2_4':'lf','1_2_5':'lf',
-      '1_3_0':'lu','1_3_1':'50','1_3_2':'50','1_3_3':'lf','1_3_4':'50','1_3_5':'50',
-      '1_4_0':'kf','1_4_1':'lf','1_4_2':'kf','1_4_3':'lf','1_4_4':'kf','1_4_5':'lf',
-      '2_0_0':'kf','2_0_1':'kf','2_0_2':'kf','2_0_3':'lf','2_0_4':'kf','2_0_5':'kf',
-      '2_1_0':'lf','2_1_1':'50','2_1_2':'lf','2_1_3':'50','2_1_4':'lf','2_1_5':'50',
-      '2_2_0':'lu','2_2_1':'lu','2_2_2':'50','2_2_3':'lu','2_2_4':'50','2_2_5':'lu',
-      '2_3_0':'ku','2_3_1':'lu','2_3_2':'lu','2_3_3':'ku','2_3_4':'lu','2_3_5':'lu',
-      '2_4_0':'50','2_4_1':'50','2_4_2':'lf','2_4_3':'50','2_4_4':'lf','2_4_5':'50',
-      '3_0_0':'50','3_0_1':'50','3_0_2':'lf','3_0_3':'50','3_0_4':'lf','3_0_5':'50',
-      '3_1_0':'kf','3_1_1':'lf','3_1_2':'50','3_1_3':'lf','3_1_4':'50','3_1_5':'kf',
-      '3_2_0':'lu','3_2_1':'lu','3_2_2':'50','3_2_3':'lu','3_2_4':'50','3_2_5':'lu',
-      '3_3_0':'lu','3_3_1':'ku','3_3_2':'lu','3_3_3':'lu','3_3_4':'lu','3_3_5':'ku',
-      '3_4_0':'lf','3_4_1':'50','3_4_2':'lf','3_4_3':'50','3_4_4':'lf','3_4_5':'50',
-      '4_0_0':'kf','4_0_1':'kf','4_0_2':'lf','4_0_3':'kf','4_0_4':'lf','4_0_5':'kf',
-      '4_1_0':'lu','4_1_1':'lu','4_1_2':'50','4_1_3':'lu','4_1_4':'50','4_1_5':'lu',
-      '4_2_0':'50','4_2_1':'50','4_2_2':'lf','4_2_3':'lf','4_2_4':'lf','4_2_5':'50',
-      '4_3_0':'kf','4_3_1':'50','4_3_2':'lf','4_3_3':'50','4_3_4':'kf','4_3_5':'lf',
-      '4_4_0':'lu','4_4_1':'ku','4_4_2':'lu','4_4_3':'ku','4_4_4':'lu','4_4_5':'lu'
-    },
-    extraMatrix:{
-      // Rivendell (xi=0) vs unsere Listen (li=0..4)
-      '0_0_0':'lf','0_0_1':'lf','0_0_2':'50','0_0_3':'lf','0_0_4':'50','0_0_5':'lf',
-      '1_0_0':'kf','1_0_1':'kf','1_0_2':'lf','1_0_3':'kf','1_0_4':'lf','1_0_5':'kf',
-      '2_0_0':'50','2_0_1':'50','2_0_2':'lf','2_0_3':'50','2_0_4':'lf','2_0_5':'50',
-      '3_0_0':'lf','3_0_1':'50','3_0_2':'lf','3_0_3':'lf','3_0_4':'50','3_0_5':'50',
-      '4_0_0':'kf','4_0_1':'lf','4_0_2':'kf','4_0_3':'lf','4_0_4':'kf','4_0_5':'lf',
-      // Umbar (xi=1)
-      '0_1_0':'lu','0_1_1':'50','0_1_2':'lu','0_1_3':'50','0_1_4':'lu','0_1_5':'50',
-      '1_1_0':'50','1_1_1':'lf','1_1_2':'50','1_1_3':'lf','1_1_4':'50','1_1_5':'lf',
-      '2_1_0':'kf','2_1_1':'kf','2_1_2':'lf','2_1_3':'kf','2_1_4':'lf','2_1_5':'kf',
-      '3_1_0':'lu','3_1_1':'lu','3_1_2':'50','3_1_3':'lu','3_1_4':'50','3_1_5':'lu',
-      '4_1_0':'50','4_1_1':'50','4_1_2':'lf','4_1_3':'50','4_1_4':'lf','4_1_5':'50'
-    },
-    selectedCombo:[0,1,2,3,4],
-    tourneyTeams:[
-      {
-        name:'Team Sauron',open:false,ratings:{},
-        lists:[
-          {type:'meta',val:'Mordor',manual:''},
-          {type:'meta',val:'Angmar',manual:''},
-          {type:'meta',val:'Goblins',manual:''},
-          {type:'meta',val:'Easterlins',manual:''},
-          {type:'meta',val:'Harad',manual:''}
-        ]
-      },
-      {
-        name:'Team Saruman',open:false,ratings:{},
-        lists:[
-          {type:'meta',val:'Goblins',manual:''},
-          {type:'meta',val:'Easterlins',manual:''},
-          {type:'meta',val:'Mordor',manual:''},
-          {type:'extra',val:'Rivendell',manual:''},
-          {type:'meta',val:'Harad',manual:''}
-        ]
-      },
-      {
-        name:'Team Gandalf',open:false,ratings:{},
-        lists:[
-          {type:'meta',val:'Angmar',manual:''},
-          {type:'meta',val:'Easterlins',manual:''},
-          {type:'meta',val:'Goblins',manual:''},
-          {type:'meta',val:'Mordor',manual:''},
-          {type:'extra',val:'Umbar',manual:''}
-        ]
-      }
-    ],
-    currentRound:0,
-    rounds:[
-      {
-        scenario:'Domination',oppName:'Team Sauron',teamIdx:0,
-        oppLists:['Mordor','Angmar','Goblins','Easterlins','Harad'],
-        oppStruck:'Goblins',myStruck:'4',oppAttacker:'Mordor',
-        attacker:'0',pool:'1',defA:'Mordor',defB:'Angmar',mRatings:{},
-        matchups:[
-          {myList:'0',oppList:'Mordor',myPts:14,oppPts:8},
-          {myList:'1',oppList:'Angmar',myPts:6,oppPts:12},
-          {myList:'2',oppList:'Harad',myPts:12,oppPts:10},
-          {myList:'3',oppList:'Easterlins',myPts:8,oppPts:8}
-        ]
-      },
-      {
-        scenario:'To the Death',oppName:'Team Saruman',teamIdx:1,
-        oppLists:['Goblins','Easterlins','Mordor','Rivendell','Harad'],
-        oppStruck:'Harad',myStruck:'2',oppAttacker:'Easterlins',
-        attacker:'1',pool:'0',defA:'Goblins',defB:'Easterlins',mRatings:{},
-        matchups:[
-          {myList:'0',oppList:'Goblins',myPts:16,oppPts:6},
-          {myList:'1',oppList:'Easterlins',myPts:8,oppPts:10},
-          {myList:'3',oppList:'Rivendell',myPts:10,oppPts:10},
-          {myList:'4',oppList:'Mordor',myPts:12,oppPts:8}
-        ]
-      },
-      {
-        scenario:'Hold Ground',oppName:'Team Gandalf',teamIdx:2,
-        oppLists:['Angmar','Easterlins','Goblins','Mordor','Umbar'],
-        oppStruck:'Goblins',myStruck:'0',oppAttacker:'Angmar',
-        attacker:'1',pool:'3',defA:'Angmar',defB:'Easterlins',mRatings:{},
-        matchups:[
-          {myList:'1',oppList:'Angmar',myPts:5,oppPts:14},
-          {myList:'2',oppList:'Easterlins',myPts:11,oppPts:9},
-          {myList:'3',oppList:'Mordor',myPts:10,oppPts:10},
-          {myList:'4',oppList:'Umbar',myPts:14,oppPts:7}
-        ]
-      },
-      {
-        scenario:'Reconnoitre',oppName:'Team Aragorn',teamIdx:-1,
-        oppLists:['Harad','Mordor','Angmar','Easterlins','Goblins'],
-        oppStruck:'Angmar',myStruck:'3',oppAttacker:'Harad',
-        attacker:'2',pool:'0',defA:'Harad',defB:'Mordor',mRatings:{},
-        matchups:[
-          {myList:'0',oppList:'Mordor',myPts:9,oppPts:13},
-          {myList:'1',oppList:'Easterlins',myPts:14,oppPts:6},
-          {myList:'2',oppList:'Harad',myPts:11,oppPts:9},
-          {myList:'4',oppList:'Goblins',myPts:12,oppPts:8}
-        ]
-      },
-      {
-        scenario:'Fog of War',oppName:'Team Legolas',teamIdx:-1,
-        oppLists:['Mordor','Goblins','Harad','Easterlins','Angmar'],
-        oppStruck:'Easterlins',myStruck:'1',oppAttacker:'Mordor',
-        attacker:'0',pool:'2',defA:'Mordor',defB:'Goblins',mRatings:{},
-        matchups:[
-          {myList:'0',oppList:'Mordor',myPts:13,oppPts:9},
-          {myList:'2',oppList:'Goblins',myPts:15,oppPts:5},
-          {myList:'3',oppList:'Harad',myPts:7,oppPts:13},
-          {myList:'4',oppList:'Angmar',myPts:10,oppPts:10}
-        ]
-      },
-      {
-        scenario:'Clash by Moonlight',oppName:'Team Gimli',teamIdx:-1,
-        oppLists:['Angmar','Harad','Mordor','Goblins','Easterlins'],
-        oppStruck:'Harad',myStruck:'2',oppAttacker:'Angmar',
-        attacker:'3',pool:'1',defA:'Angmar',defB:'Mordor',mRatings:{},
-        matchups:[
-          {myList:'0',oppList:'Easterlins',myPts:10,oppPts:10},
-          {myList:'1',oppList:'Mordor',myPts:12,oppPts:8},
-          {myList:'3',oppList:'Angmar',myPts:6,oppPts:14},
-          {myList:'4',oppList:'Goblins',myPts:13,oppPts:7}
-        ]
-      }
-    ]
-  };
-  localStorage.setItem(SK,JSON.stringify(td));
-  Object.assign(G,td);
-  renderPlayers();
-  renderCandidates();
-  renderEnemies();
-  renderExtraEnemyInputs();
-  renderMatrixTabs();
-  renderExtraMatrix();
-  renderTourneyTeams();
-  setMode('auswertung');
-}
 
 // ══════════════════════════════════════════════════════════════════
 // INIT
