@@ -456,7 +456,13 @@ function subscribeRealtime(turnierId){
         G.extraMatrix=newExtraMatrix;
         saveLocal();
         renderMatrixContent();
+        renderPlayers();
+        renderCandidates();
+        renderEnemies();
+        renderExtraEnemyInputs();
+        renderMatrixTabs();
         if(currentPhaseIdx===4)renderPortfolio();
+        if(currentPhaseIdx===5)renderTourneyTeams();
       })
     .subscribe();
 }
