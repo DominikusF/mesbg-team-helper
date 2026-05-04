@@ -2052,11 +2052,9 @@ function renderAuswUebersicht(){
     if(r.attacker===''||r.attacker===undefined)return;
     const atkListIdx=parseInt(r.attacker);
     if(isNaN(atkListIdx)||!G.selectedCombo)return;
-    // attacker is a list index in selectedCombo; find which player owns it
-    const realLi=G.selectedCombo[atkListIdx];
-    const cand=G.candidates[realLi];
-    if(!cand||!cand.players.length)return;
-    cand.players.forEach(pi=>{if(pi<atkCounts.length)atkCounts[pi]++;});
+    // Find which matchup was played by the attacker list
+    const atkMatchup=r.matchups.findIndex(m=>m.myList===String(atkListIdx)&&m.myPts!==null);
+    if(atkMatchup>=0&&atkMatchup<atkCounts.length)atkCounts[atkMatchup]++;
   });
   const maxAtk=Math.max(...atkCounts);
   if(maxAtk>0){
