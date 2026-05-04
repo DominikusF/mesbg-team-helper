@@ -451,7 +451,11 @@ function subscribeRealtime(turnierId){
         _dirtyMatrixKeys.forEach(k=>{newMatrix[k]=G.matrix[k];});
         const newExtraMatrix=Object.assign({},remote.extraMatrix||{});
         _dirtyExtraMatrixKeys.forEach(k=>{newExtraMatrix[k]=G.extraMatrix[k];});
+        const preserveRound=G.currentRound;
+        const preserveRounds=G.rounds;
         Object.assign(G,remote);
+        G.currentRound=preserveRound;
+        G.rounds=preserveRounds;
         G.matrix=newMatrix;
         G.extraMatrix=newExtraMatrix;
         saveLocal();
@@ -618,7 +622,7 @@ async function syncToCloud(){
     const merged=Object.assign({},remote,{
       players:G.players,teamName:G.teamName,candidates:G.candidates,
       enemies:G.enemies,selectedCombo:G.selectedCombo,tourneyTeams:G.tourneyTeams,
-      scenarios:G.scenarios,extraLists:G.extraLists,currentRound:G.currentRound,rounds:G.rounds
+      scenarios:G.scenarios,extraLists:G.extraLists,rounds:G.rounds
     });
     const mergedMatrix=Object.assign({},remote.matrix||{});
     _dirtyMatrixKeys.forEach(k=>{ mergedMatrix[k]=G.matrix[k]; });
