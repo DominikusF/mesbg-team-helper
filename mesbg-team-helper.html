@@ -608,6 +608,8 @@ async function newTurnier(){
   }catch(e){showToast('Fehler: '+e.message);}
 }
 
+let _lastSyncTime=0;
+
 async function syncToCloud(){
   if(!currentTurnierId||!_dirty)return;
   _dirty=false;
@@ -637,6 +639,7 @@ async function syncToCloud(){
     });
     Object.assign(G,merged);
     localStorage.setItem(SK,JSON.stringify(G));
+    _lastSyncTime=Date.now();
   }catch(e){console.warn('Cloud sync failed:',e);_dirty=true;}// reset dirty so retry happens
 }
 
@@ -1364,7 +1367,7 @@ function updateRoundBadge(){
   });
 }
 function setRound(i){
-  G.currentRound=i;save();
+  G.currentRound=i;saveLocal();
   document.getElementById('round-dd').classList.remove('open');
   updateRoundBadge();
   const r=R();
