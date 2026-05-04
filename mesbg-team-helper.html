@@ -296,7 +296,7 @@ textarea.import-area{min-height:80px;font-size:13px;font-family:var(–mono)}
       </select>
       <div style="margin-top:8px">
         <div class="label" style="margin-bottom:4px">Teamname</div>
-        <input type="text" id="opp-name" placeholder="Gegner-Team…" oninput="R().oppName=this.value;save()">
+        <input type="text" id="opp-name" placeholder="Gegner-Team…" oninput="R().oppName=this.value;saveLocal()" onblur="save()">
       </div>
       <div class="divider"></div>
       <div class="card-title">Gegner-Listen</div>
@@ -469,7 +469,13 @@ let matrixTab=0;
 // ══════════════════════════════════════════════════════════════════
 // PERSISTENCE
 // ══════════════════════════════════════════════════════════════════
-function save(){localStorage.setItem(SK,JSON.stringify(G));syncToCloud();}
+function saveLocal(){localStorage.setItem(SK,JSON.stringify(G));}
+let _syncTimer=null;
+function save(){
+  saveLocal();
+  clearTimeout(_syncTimer);
+  _syncTimer=setTimeout(syncToCloud,300);
+}
 function load(){
   try{const d=JSON.parse(localStorage.getItem(SK)||'{}');
     if(d.players)G.players=d.players;
@@ -543,10 +549,17 @@ async function newTurnier(){
 async function syncToCloud(){
   if(!currentBinId)return;
   try{
+    const res=await fetch(getBinUrl(currentBinId)+'/latest',{
+      headers:{'X-Master-Key':JBKEY}
+    });
+    const d=await res.json();
+    const remote=d.record||{};
+    // Merge: remote as base, local G on top
+    const merged=Object.assign({},remote,G);
     await fetch(getBinUrl(currentBinId),{
       method:'PUT',
       headers:{'Content-Type':'application/json','X-Master-Key':JBKEY},
-      body:JSON.stringify(G)
+      body:JSON.stringify(merged)
     });
   }catch(e){console.warn('Cloud sync failed:',e);}
 }
@@ -714,12 +727,12 @@ function renderPlayers(){
   document.getElementById('player-inputs').innerHTML=
     `<div class="row" style="margin-bottom:14px">
       <span class="hint" style="min-width:70px">Teamname</span>
-      <input type="text" value="${G.teamName||''}" placeholder="z.B. Team Deutschland..." oninput="G.teamName=this.value;save()">
+      <input type="text" value="${G.teamName||''}" placeholder="z.B. Team Deutschland..." oninput="G.teamName=this.value;saveLocal()" onblur="save()">
     </div>`+
     G.players.map((p,i)=>`
     <div class="row">
       <span class="hint" style="min-width:70px">Spieler ${i+1}</span>
-      <input type="text" value="${p}" placeholder="Name..." oninput="G.players[${i}]=this.value;save()">
+      <input type="text" value="${p}" placeholder="Name..." oninput="G.players[${i}]=this.value;saveLocal()" onblur="save()">
     </div>`).join('');
 }
 
@@ -745,7 +758,7 @@ function renderCandidates(){
     <div class="list-row">
       <div style="display:flex;gap:8px;margin-bottom:10px">
         <input type="text" value="${c.name}" placeholder="Listenname..." style="flex:1"
-          oninput="G.candidates[${i}].name=this.value;save();renderMatrixTabs()">
+          oninput="G.candidates[${i}].name=this.value;saveLocal();renderMatrixTabs()" onblur="save()">
         <button class="btn btn-sm btn-danger" onclick="removeCandidate(${i})">×</button>
       </div>
       <div class="label" style="margin-bottom:6px">Spieler</div>
@@ -786,7 +799,7 @@ function renderEnemies(){
   document.getElementById('enemy-inputs').innerHTML=G.enemies.map((e,i)=>`
     <div class="row">
       <input type="text" value="${e}" placeholder="z.B. Mordor Ringwraiths..."
-        oninput="G.enemies[${i}]=this.value;save();renderMatrixContent()">
+        oninput="G.enemies[${i}]=this.value;saveLocal();renderMatrixContent()" onblur="save()">
       <button class="btn btn-sm btn-danger" onclick="removeEnemy(${i})">×</button>
     </div>`).join('');
 }
@@ -821,7 +834,7 @@ function renderExtraEnemyInputs(){
   wrap.innerHTML=extras.map((e,xi)=>`
     <div class="row">
       <input type="text" value="${e}" placeholder="z.B. Rivendell Host..."
-        oninput="G.extraLists[${xi}]=this.value;save();renderMatrixContent()">
+        oninput="G.extraLists[${xi}]=this.value;saveLocal();renderMatrixContent()" onblur="save()">
       <button class="btn btn-sm btn-danger" onclick="removeExtraEnemy(${xi})">×</button>
     </div>`).join('');
 }
@@ -1126,7 +1139,7 @@ function renderTourneyTeams(){
     return`<div class="combo-card" style="margin-bottom:10px">
       <div style="display:flex;gap:8px;align-items:center">
         <input type="text" value="${team.name}" placeholder="Teamname..." style="flex:1;font-weight:600;font-size:14px;background:none;border:none;border-bottom:1px solid #ddd;border-radius:0;padding:4px 0"
-          oninput="G.tourneyTeams[${ti}].name=this.value;save()">
+          oninput="G.tourneyTeams[${ti}].name=this.value;saveLocal()" onblur="save()">
         <button class="btn btn-sm btn-danger" onclick="G.tourneyTeams.splice(${ti},1);save();renderTourneyTeams()">×</button>
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:4px;margin:8px 0">
@@ -1811,12 +1824,12 @@ function renderResults(){
       <div style="display:flex;align-items:center;gap:10px">
         <div><div class="label">Unsere Pkt</div>
           <input type="number" min="0" max="20" value="${myP??''}" placeholder="0"
-            oninput="G.rounds[${G.currentRound}].matchups[${mi}].myPts=this.value===''?null:parseInt(this.value);save();renderResults()">
+            oninput="G.rounds[${G.currentRound}].matchups[${mi}].myPts=this.value===''?null:parseInt(this.value);saveLocal();renderResults()" onblur="save()">
         </div>
         <div style="color:#888;margin-top:14px">:</div>
         <div><div class="label">Gegner Pkt</div>
           <input type="number" min="0" max="20" value="${opP??''}" placeholder="0"
-            oninput="G.rounds[${G.currentRound}].matchups[${mi}].oppPts=this.value===''?null:parseInt(this.value);save();renderResults()">
+            oninput="G.rounds[${G.currentRound}].matchups[${mi}].oppPts=this.value===''?null:parseInt(this.value);saveLocal();renderResults()" onblur="save()">
         </div>
         <div style="margin-top:14px;flex:1;text-align:right">
           <div style="font-size:13px;font-weight:600;color:${oc}">${outcome}</div>
