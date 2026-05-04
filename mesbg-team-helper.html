@@ -568,6 +568,8 @@ async function syncToCloud(){
       headers:{...SB_HEADERS,'Prefer':'return=minimal'},
       body:JSON.stringify({data:merged,updated_at:new Date().toISOString()})
     });
+    Object.assign(G,merged);
+    saveLocal();
   }catch(e){console.warn('Cloud sync failed:',e);}
 }
 
