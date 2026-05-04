@@ -167,6 +167,8 @@ textarea.import-area{min-height:80px;font-size:13px;font-family:var(–mono)}
       <span></span><span></span><span></span>
     </button>
     <div class="burger-menu" id="burger-menu">
+      <div class="bmenu-item" onclick="newTurnier()">☁ Neues Turnier</div>
+      <div class="bmenu-item" onclick="copyTurnierLink()">🔗 Link kopieren</div>
       <div class="bmenu-item" onclick="doFullExport()">↑ Exportieren</div>
       <div class="bmenu-item" onclick="showImportPanel()">↓ Importieren</div>
       <div class="bmenu-item" onclick="loadTestData()">🧪 Testdaten laden</div>
@@ -431,6 +433,9 @@ const RATINGS=[
   {val:'ku',label:'−−',pts:0.0}
 ];
 const SK='mesbg_v1';
+const JBKEY='$2a$10$kENC2qoucaYvDBDaPfax6OlrETY.Ao.MV2kzEzxXSIlwnYMAFuEm6';
+const JBCOL='69f83f4aaaba8821976b462c';
+let currentBinId=null;
 
 // ══════════════════════════════════════════════════════════════════
 // STATE — single shared object
@@ -464,7 +469,7 @@ let matrixTab=0;
 // ══════════════════════════════════════════════════════════════════
 // PERSISTENCE
 // ══════════════════════════════════════════════════════════════════
-function save(){localStorage.setItem(SK,JSON.stringify(G));}
+function save(){localStorage.setItem(SK,JSON.stringify(G));syncToCloud();}
 function load(){
   try{const d=JSON.parse(localStorage.getItem(SK)||'{}');
     if(d.players)G.players=d.players;
@@ -513,8 +518,70 @@ function doImport(){
 }
 
 // ══════════════════════════════════════════════════════════════════
-// TOPBAR MENUS
+// CLOUD SYNC (jsonbin.io)
 // ══════════════════════════════════════════════════════════════════
+function getBinUrl(id){return`https://api.jsonbin.io/v3/b/${id}`;}
+
+async function newTurnier(){
+  closeBurger();
+  if(!confirm('Neues Turnier anlegen? Aktueller lokaler Stand bleibt erhalten.'))return;
+  showToast('Turnier wird angelegt…');
+  try{
+    const res=await fetch('https://api.jsonbin.io/v3/b',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Master-Key':JBKEY,'X-Collection-Id':JBCOL,'X-Bin-Name':'Turnier '+new Date().toLocaleDateString('de')},
+      body:JSON.stringify(G)
+    });
+    const d=await res.json();
+    currentBinId=d.metadata.id;
+    location.hash='bin='+currentBinId;
+    showToast('Turnier angelegt ✓ Link in Zwischenablage kopiert');
+    copyTurnierLink();
+  }catch(e){showToast('Fehler beim Anlegen: '+e.message);}
+}
+
+async function syncToCloud(){
+  if(!currentBinId)return;
+  try{
+    await fetch(getBinUrl(currentBinId),{
+      method:'PUT',
+      headers:{'Content-Type':'application/json','X-Master-Key':JBKEY},
+      body:JSON.stringify(G)
+    });
+  }catch(e){console.warn('Cloud sync failed:',e);}
+}
+
+async function loadFromCloud(binId){
+  showToast('Lade Turnier…');
+  try{
+    const res=await fetch(getBinUrl(binId)+'/latest',{
+      headers:{'X-Master-Key':JBKEY}
+    });
+    const d=await res.json();
+    Object.assign(G,d.record);
+    currentBinId=binId;
+    save();
+    showToast('Turnier geladen ✓');
+    return true;
+  }catch(e){showToast('Fehler beim Laden: '+e.message);return false;}
+}
+
+function copyTurnierLink(){
+  closeBurger();
+  if(!currentBinId){showToast('Erst ein Turnier anlegen.');return;}
+  const url=location.origin+location.pathname+'#bin='+currentBinId;
+  navigator.clipboard?.writeText(url);
+  showToast('Link kopiert ✓');
+}
+
+function showToast(msg){
+  let t=document.getElementById('toast');
+  if(!t){t=document.createElement('div');t.id='toast';
+    t.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1a1a1a;color:#fff;padding:10px 18px;border-radius:20px;font-size:13px;z-index:600;transition:opacity .3s';
+    document.body.appendChild(t);}
+  t.textContent=msg;t.style.opacity='1';
+  clearTimeout(t._t);t._t=setTimeout(()=>t.style.opacity='0',2500);
+}
 function toggleModeDD(){
   const dd=document.getElementById('mode-dd');
   const btn=document.getElementById('mode-btn');
@@ -778,26 +845,26 @@ function renderMatrixContent(){
   sc.forEach(s=>html+=`<th style="min-width:80px">${s.length>12?s.slice(0,11)+'…':s}</th>`);
   html+='</tr></thead><tbody>';
   // Meta enemies
-  ve.forEach(e=>{
+  ve.forEach((e,metaIdx)=>{
     const ei=G.enemies.indexOf(e);
-    html+=`<tr><td style="font-size:12px;padding:6px 4px;color:#555;white-space:nowrap">${e}</td>`;
+    const isLast=metaIdx===ve.length-1&&extraLists.length;
+    const lastStyle=isLast?'border-bottom:none':'';
+    html+=`<tr><td style="font-size:12px;padding:6px 4px;color:#555;white-space:nowrap;${lastStyle}">${e}</td>`;
     sc.forEach((_,ci)=>{
       const key=mkey(li,ei,ci);const val=G.matrix[key]||'';
-      html+=`<td>${rSel(`mx_${li}_${ei}_${ci}`,val,`G.matrix['${key}']=this.value;save()`)}</td>`;
+      html+=`<td style="${lastStyle}">${rSel(`mx_${li}_${ei}_${ci}`,val,`G.matrix['${key}']=this.value;save()`)}</td>`;
     });
     html+='</tr>';
   });
-  // Dashed separator + extra enemies
+  // Extra enemies with dashed top border on first row
   if(extraLists.length){
-    if(ve.length){
-      html+=`<tr><td colspan="${sc.length+1}" style="border-top:2px dashed #ccc;padding:0"></td></tr>`;
-    }
     extraLists.forEach((extra,xi)=>{
-      html+=`<tr style="border-top:${xi===0&&!ve.length?'none':''}"><td style="font-size:12px;padding:6px 4px;color:#888;white-space:nowrap;font-style:italic">${extra}</td>`;
+      const sep=xi===0&&ve.length?'border-top:1px solid #ccc':'';
+      html+=`<tr><td style="font-size:12px;padding:6px 4px;color:#888;white-space:nowrap;font-style:italic;${sep}">${extra}</td>`;
       sc.forEach((_,ci)=>{
         const key=`${li}_${xi}_${ci}`;
         const val=(G.extraMatrix||{})[key]||'';
-        html+=`<td>${rSel(`exmx_${li}_${xi}_${ci}`,val,`updExtraMatrix(${li},${xi},${ci},this.value)`)}</td>`;
+        html+=`<td style="${sep}">${rSel(`exmx_${li}_${xi}_${ci}`,val,`updExtraMatrix(${li},${xi},${ci},this.value)`)}</td>`;
       });
       html+='</tr>';
     });
@@ -2104,12 +2171,26 @@ function loadTestData(){
 // ══════════════════════════════════════════════════════════════════
 // INIT
 // ══════════════════════════════════════════════════════════════════
-load();
-renderPlayers();
-renderCandidates();
-renderEnemies();
-renderMatrixTabs();
-document.getElementById('round-badge-wrap').style.display='none';
+function initRender(){
+  renderPlayers();
+  renderCandidates();
+  renderEnemies();
+  renderExtraEnemyInputs();
+  renderMatrixTabs();
+  document.getElementById('round-badge-wrap').style.display='none';
+}
+
+(async()=>{
+  const hash=location.hash.slice(1);
+  const binParam=hash.match(/bin=([a-f0-9]+)/i);
+  if(binParam){
+    const ok=await loadFromCloud(binParam[1]);
+    if(!ok)load(); // fallback to localStorage
+  } else {
+    load();
+  }
+  initRender();
+})();
 </script>
 
 </body>
