@@ -523,7 +523,13 @@ function load(){
 
 function confirmReset(){
   closeBurger();
-  if(confirm('Alle Daten löschen?')){localStorage.removeItem(SK);location.reload();}
+  if(confirm('Lokale Daten löschen? Cloud-Daten bleiben erhalten.')){
+    localStorage.removeItem(SK);
+    if(_realtimeChannel)sb.removeChannel(_realtimeChannel);
+    currentTurnierId=null;
+    location.hash='';
+    location.reload();
+  }
 }
 
 function doFullExport(){
@@ -665,6 +671,15 @@ document.addEventListener('click',e=>{
     document.getElementById('round-dd').classList.remove('open');
 });
 
+function getNavHash(){
+  const base=currentTurnierId?`turnier=${currentTurnierId}`:'';
+  const nav=`mode=${currentMode}&phase=${currentPhaseIdx}&view=${currentViewId}`;
+  return base?`${base}&${nav}`:nav;
+}
+function updateNavHash(){
+  history.replaceState(null,'','#'+getNavHash());
+}
+
 function setMode(mode){
   closeModeDD();
   currentMode=mode;
@@ -686,6 +701,7 @@ function setMode(mode){
     renderStrike();renderAttack();
   }
   if(mode==='auswertung')renderAuswertung();
+  updateNavHash();
   window.scrollTo(0,0);
 }
 
@@ -734,6 +750,7 @@ function goPhase(idx){
   if(idx===3){renderEnemies();renderExtraEnemyInputs();renderMatrixTabs();}
   if(idx===4)renderPortfolio();
   if(idx===5)renderTourneyTeams();
+  updateNavHash();
   window.scrollTo(0,0);
 }
 
@@ -1308,6 +1325,7 @@ function showView(id){
   if(id==='defend')renderDefend();
   if(id==='decision')renderDecisionSelects();
   if(id==='results')renderResults();
+  updateNavHash();
   window.scrollTo(0,0);
 }
 
@@ -1912,6 +1930,7 @@ function showAuswTab(id){
     t.classList.toggle('active',['uebersicht','matchups'][i]===id));
   if(id==='uebersicht')renderAuswUebersicht();
   if(id==='matchups')renderAuswMatchups();
+  updateNavHash();
 }
 
 function renderAuswertung(){
@@ -2241,15 +2260,22 @@ function initRender(){
 
 (async()=>{
   const hash=location.hash.slice(1);
-  const param=hash.match(/turnier=([\w-]+)/i);
-  if(param){
+  const params=Object.fromEntries(hash.split('&').map(p=>p.split('=')));
+  if(params.turnier){
     await new Promise(r=>setTimeout(r,300));
-    const ok=await loadFromCloud(param[1]);
+    const ok=await loadFromCloud(params.turnier);
     if(!ok)load();
   } else {
     load();
   }
   initRender();
+  // Restore nav state
+  if(params.mode&&['setup','turnier','auswertung'].includes(params.mode)){
+    setMode(params.mode);
+    if(params.mode==='setup'&&params.phase!==undefined)goPhase(parseInt(params.phase));
+    if(params.mode==='turnier'&&params.view)showView(params.view);
+    if(params.mode==='auswertung'&&params.view)showAuswTab(params.view);
+  }
 })();
 </script>
 
