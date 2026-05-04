@@ -5,6 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>MESBG</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
 :root{--r:10px;--r2:6px;--font:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;--mono:'Courier New',monospace}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
@@ -435,7 +436,30 @@ const RATINGS=[
 const SK='mesbg_v1';
 const SB_URL='https://jovnqzxgjdewapkfitxw.supabase.co';
 const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impvdm5xenhnamRld2Fwa2ZpdHh3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc5MTI4MTEsImV4cCI6MjA5MzQ4ODgxMX0.WrNlcElTbHhcO3ux8ekpL_jhhiSbn3iSLnxP1ucrUHI';
+const sb=supabase.createClient(SB_URL,SB_KEY);
 let currentTurnierId=null;
+let _realtimeChannel=null;
+
+function subscribeRealtime(turnierId){
+  if(_realtimeChannel)sb.removeChannel(_realtimeChannel);
+  _realtimeChannel=sb.channel('turnier-'+turnierId)
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'turniere',filter:`id=eq.${turnierId}`},
+      payload=>{
+        if(!payload.new?.data)return;
+        const remote=payload.new.data;
+        const newMatrix=Object.assign({},remote.matrix||{});
+        _dirtyMatrixKeys.forEach(k=>{newMatrix[k]=G.matrix[k];});
+        const newExtraMatrix=Object.assign({},remote.extraMatrix||{});
+        _dirtyExtraMatrixKeys.forEach(k=>{newExtraMatrix[k]=G.extraMatrix[k];});
+        Object.assign(G,remote);
+        G.matrix=newMatrix;
+        G.extraMatrix=newExtraMatrix;
+        saveLocal();
+        renderMatrixContent();
+        if(currentPhaseIdx===4)renderPortfolio();
+      })
+    .subscribe();
+}
 
 // ══════════════════════════════════════════════════════════════════
 // STATE — single shared object
@@ -470,6 +494,8 @@ let matrixTab=0;
 // PERSISTENCE
 // ══════════════════════════════════════════════════════════════════
 function saveLocal(){localStorage.setItem(SK,JSON.stringify(G));}
+let _dirtyMatrixKeys=new Set();
+let _dirtyExtraMatrixKeys=new Set();
 let _dirty=false;
 let _syncTimer=null;
 function save(){
@@ -546,6 +572,7 @@ async function newTurnier(){
     if(!res.ok)throw new Error(await res.text());
     currentTurnierId=id;
     location.hash='turnier='+id;
+    subscribeRealtime(id);
     copyTurnierLink();
     showToast('Turnier angelegt ✓ Link kopiert');
   }catch(e){showToast('Fehler: '+e.message);}
@@ -559,10 +586,20 @@ async function syncToCloud(){
     const res=await fetch(sbUrl()+'?id=eq.'+currentTurnierId+'&select=data',{headers:SB_HEADERS});
     const rows=await res.json();
     const remote=(rows[0]?.data)||{};
-    // Merge: remote base, local G on top, deep merge matrix fields
-    const merged=Object.assign({},remote,G);
-    merged.matrix=Object.assign({},remote.matrix||{},G.matrix||{});
-    merged.extraMatrix=Object.assign({},remote.extraMatrix||{},G.extraMatrix||{});
+    // Start from remote, overlay only locally changed matrix keys
+    const merged=Object.assign({},remote,{
+      players:G.players,teamName:G.teamName,candidates:G.candidates,
+      enemies:G.enemies,selectedCombo:G.selectedCombo,tourneyTeams:G.tourneyTeams,
+      scenarios:G.scenarios,extraLists:G.extraLists,currentRound:G.currentRound,rounds:G.rounds
+    });
+    const mergedMatrix=Object.assign({},remote.matrix||{});
+    _dirtyMatrixKeys.forEach(k=>{ mergedMatrix[k]=G.matrix[k]; });
+    const mergedExtraMatrix=Object.assign({},remote.extraMatrix||{});
+    _dirtyExtraMatrixKeys.forEach(k=>{ mergedExtraMatrix[k]=G.extraMatrix[k]; });
+    merged.matrix=mergedMatrix;
+    merged.extraMatrix=mergedExtraMatrix;
+    _dirtyMatrixKeys.clear();
+    _dirtyExtraMatrixKeys.clear();
     await fetch(sbUrl()+'?id=eq.'+currentTurnierId,{
       method:'PATCH',
       headers:{...SB_HEADERS,'Prefer':'return=minimal'},
@@ -582,6 +619,7 @@ async function loadFromCloud(turnierId){
     Object.assign(G,rows[0].data);
     currentTurnierId=turnierId;
     saveLocal();
+    subscribeRealtime(turnierId);
     showToast('Turnier geladen ✓');
     return true;
   }catch(e){showToast('Fehler beim Laden: '+e.message);return false;}
@@ -873,7 +911,7 @@ function renderMatrixContent(){
     html+=`<tr><td style="font-size:12px;padding:6px 4px;color:#555;white-space:nowrap;${lastStyle}">${e}</td>`;
     sc.forEach((_,ci)=>{
       const key=mkey(li,ei,ci);const val=G.matrix[key]||'';
-      html+=`<td style="${lastStyle}">${rSel(`mx_${li}_${ei}_${ci}`,val,`G.matrix['${key}']=this.value;save()`)}</td>`;
+      html+=`<td style="${lastStyle}">${rSel(`mx_${li}_${ei}_${ci}`,val,`G.matrix['${key}']=this.value;_dirtyMatrixKeys.add('${key}');save()`)}</td>`;
     });
     html+='</tr>';
   });
@@ -885,7 +923,7 @@ function renderMatrixContent(){
       sc.forEach((_,ci)=>{
         const key=`${li}_${xi}_${ci}`;
         const val=(G.extraMatrix||{})[key]||'';
-        html+=`<td style="${sep}">${rSel(`exmx_${li}_${xi}_${ci}`,val,`updExtraMatrix(${li},${xi},${ci},this.value)`)}</td>`;
+        html+=`<td style="${sep}">${rSel(`exmx_${li}_${xi}_${ci}`,val,`updExtraMatrix(${li},${xi},${ci},this.value);_dirtyExtraMatrixKeys.add('${li}_${xi}_${ci}')`)}</td>`;
       });
       html+='</tr>';
     });
