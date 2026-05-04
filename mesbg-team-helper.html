@@ -307,7 +307,10 @@ select:focus{outline:none;border-color:#6ab820}
       <div class="card-title">Gegner-Listen</div>
       <div id="opp-lists-input"></div>
     </div>
-    <div class="nav-footer"><span></span><button class="btn btn-primary" onclick="showView('strike')">Weiter →</button></div>
+    <div class="nav-footer">
+      <button class="btn btn-danger btn-sm" onclick="deleteRunde()" style="font-size:12px">✕ Runde löschen</button>
+      <button class="btn btn-primary" onclick="showView('strike')">Weiter →</button>
+    </div>
   </div>
 
   <div class="content view" id="view-strike">
@@ -1429,6 +1432,16 @@ function addRunde(){
     matchups:Array(4).fill(null).map(()=>({myList:'',oppList:'',myPts:null,oppPts:null}))
   });
   G.currentRound=G.rounds.length-1;
+  save();
+  updateRoundBadge();
+  showView('runde');
+}
+
+function deleteRunde(){
+  if(G.rounds.length<=1){showToast('Mindestens eine Runde muss erhalten bleiben.');return;}
+  if(!confirm(`Runde ${G.currentRound+1} wirklich löschen?`))return;
+  G.rounds.splice(G.currentRound,1);
+  G.currentRound=Math.min(G.currentRound,G.rounds.length-1);
   save();
   updateRoundBadge();
   showView('runde');
