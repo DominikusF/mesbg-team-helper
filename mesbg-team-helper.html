@@ -469,6 +469,12 @@ function subscribeRealtime(turnierId){
           renderStrike();
           renderAttack();
           renderResults();
+          // Update static fields in turnier view
+          const r=R();
+          const catEl=document.getElementById('round-cat');
+          if(catEl)catEl.value=r.scenario||'';
+          const oppEl=document.getElementById('opp-name');
+          if(oppEl)oppEl.value=r.oppName||'';
         }
       })
     .subscribe();
