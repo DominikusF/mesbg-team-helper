@@ -475,6 +475,8 @@ function subscribeRealtime(turnierId){
           if(catEl)catEl.value=r.scenario||'';
           const oppEl=document.getElementById('opp-name');
           if(oppEl)oppEl.value=r.oppName||'';
+          renderDecisionSelects();
+          renderDecision();
         }
       })
     .subscribe();
