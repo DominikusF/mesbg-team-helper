@@ -54,18 +54,18 @@ body{font-family:var(--font);font-size:15px;min-height:100vh;padding-bottom:100p
 /* Content */
 .content{padding:16px;max-width:600px;margin:0 auto}
 @media(min-width:768px){
-  #phase-3 .matrix-wrap,
-  #phase-4 .matrix-wrap{
-    width:100vw;
-    position:relative;
-    left:50%;
-    transform:translateX(-50%);
-    padding:0 32px;
-    box-sizing:border-box;
-    overflow-x:auto;
-  }
-  #phase-3 .matrix-table,
-  #phase-4 .matrix-table{width:100%}
+#phase-3 .matrix-wrap,
+#phase-4 .matrix-wrap{
+width:100vw;
+position:relative;
+left:50%;
+transform:translateX(-50%);
+padding:0 32px;
+box-sizing:border-box;
+overflow-x:auto;
+}
+#phase-3 .matrix-table,
+#phase-4 .matrix-table{width:100%}
 }
 .mode-panel{display:none}.mode-panel.active{display:block}
 .view{display:none}.view.active{display:block}
@@ -468,7 +468,9 @@ function subscribeRealtime(turnierId){
         G.matrix=newMatrix;
         G.extraMatrix=newExtraMatrix;
         saveLocal();
+        const scrollPositions=Array.from(document.querySelectorAll('.matrix-wrap')).map(el=>el.scrollLeft);
         renderMatrixContent();
+        document.querySelectorAll('.matrix-wrap').forEach((el,i)=>{if(scrollPositions[i])el.scrollLeft=scrollPositions[i];});
         renderPlayers();
         renderCandidates();
         renderEnemies();
@@ -992,6 +994,7 @@ function renderMatrixTabs(){
   renderMatrixContent();
 }
 function renderMatrixContent(){
+  const scrollPositions=Array.from(document.querySelectorAll('.matrix-wrap')).map(el=>el.scrollLeft);
   const vc=getVC();const ve=getVE();const wrap=document.getElementById('matrix-content');
   const sc=getActiveSzenarien();
   if(!vc.length){wrap.innerHTML='<p class="hint">Erst Listen in Phase 2.</p>';return;}
@@ -1030,6 +1033,7 @@ function renderMatrixContent(){
     });
   }
   html+='</tbody></table></div>';wrap.innerHTML=html;
+  document.querySelectorAll('.matrix-wrap').forEach((el,i)=>{if(scrollPositions[i])el.scrollLeft=scrollPositions[i];});
 }
 
 // Portfolio
