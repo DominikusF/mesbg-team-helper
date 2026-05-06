@@ -54,18 +54,18 @@ body{font-family:var(--font);font-size:15px;min-height:100vh;padding-bottom:100p
 /* Content */
 .content{padding:16px;max-width:600px;margin:0 auto}
 @media(min-width:768px){
-#phase-3 .matrix-wrap,
-#phase-4 .matrix-wrap{
-width:100vw;
-position:relative;
-left:50%;
-transform:translateX(-50%);
-padding:0 32px;
-box-sizing:border-box;
-overflow-x:auto;
-}
-#phase-3 .matrix-table,
-#phase-4 .matrix-table{width:100%}
+  #phase-3 .matrix-wrap,
+  #phase-4 .matrix-wrap{
+    width:100vw;
+    position:relative;
+    left:50%;
+    transform:translateX(-50%);
+    padding:0 32px;
+    box-sizing:border-box;
+    overflow-x:auto;
+  }
+  #phase-3 .matrix-table,
+  #phase-4 .matrix-table{width:100%}
 }
 .mode-panel{display:none}.mode-panel.active{display:block}
 .view{display:none}.view.active{display:block}
@@ -989,8 +989,10 @@ function renderExtraEnemyInputs(){
 }
 function renderMatrixTabs(){
   const vc=getVC();if(matrixTab>=vc.length)matrixTab=0;
-  document.getElementById('matrix-list-tabs').innerHTML=vc.map((c,ti)=>`
-    <div class="inner-tab${ti===matrixTab?' active':''}" onclick="matrixTab=${ti};renderMatrixTabs()">${c.name||'Liste '+(ti+1)}</div>`).join('');
+  const sc=getActiveSzenarien();
+  document.getElementById('matrix-list-tabs').innerHTML=vc.map((c,ti)=>{
+    return`<div class="inner-tab${ti===matrixTab?' active':''}" onclick="matrixTab=${ti};renderMatrixTabs()">${c.name||'Liste '+(ti+1)}</div>`;
+  }).join('');
   renderMatrixContent();
 }
 function renderMatrixContent(){
@@ -1004,26 +1006,67 @@ function renderMatrixContent(){
   const extraLists=(G.extraLists||[]).filter(e=>e.trim());
   const hasAny=ve.length||extraLists.length;
   if(!hasAny){wrap.innerHTML='<p class="hint">Erst Gegner-Listen unten eintragen.</p>';return;}
-  let html='<div class="matrix-wrap"><table class="matrix-table"><thead><tr><th class="rh">Gegner</th>';
+  // Helper: score for a single cell average
+  const allEnemies=[...ve.map((_,i)=>({type:'meta',i})),...extraLists.map((_,i)=>({type:'extra',i}))];
+
+  // Total score (C) – avg over all rated cells
+  const allCellVals=[];
+  allEnemies.forEach(({type,i:ei})=>{
+    sc.forEach((_,ci)=>{
+      const v=type==='meta'?G.matrix[mkey(li,ei,ci)]||'':(G.extraMatrix||{})[`${li}_${ei}_${ci}`]||'';
+      if(v)allCellVals.push(getPts(v));
+    });
+  });
+  const totalScore=allCellVals.length?allCellVals.reduce((a,b)=>a+b,0)/allCellVals.length:null;
+  const totalCls=totalScore!==null?chipCls(totalScore):'50';
+  const totalLbl=totalScore!==null?totalScore.toFixed(2):'–';
+
+  // Column scores (B) – avg per scenario
+  const colScores=sc.map((_,ci)=>{
+    const vals=allEnemies.map(({type,i:ei})=>{
+      const v=type==='meta'?G.matrix[mkey(li,ei,ci)]||'':(G.extraMatrix||{})[`${li}_${ei}_${ci}`]||'';
+      return v?getPts(v):null;
+    }).filter(v=>v!==null);
+    return vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:null;
+  });
+
+  let html='<div class="matrix-wrap"><table class="matrix-table"><thead><tr>';
+  html+=`<th class="rh" style="font-weight:400;color:#888;font-size:11px">Gegner</th>`;
   sc.forEach(s=>html+=`<th style="min-width:80px">${s.length>12?s.slice(0,11)+'…':s}</th>`);
-  html+='</tr></thead><tbody>';
-  // Meta enemies
+  html+='</tr>';
+  // B+C: column scores row with total score on left
+  html+='<tr style="background:#fafaf8">';
+  html+=`<td style="padding:3px 4px">${totalScore!==null?`<span style="font-size:10px;color:${totalScore>=1.05?'#4a8c10':totalScore>=0.85?'#888':'#c00'};font-family:var(--mono);font-weight:600">${totalLbl}</span>`:'<span style="color:#ddd;font-size:10px">–</span>'}</td>`;
+  colScores.forEach(s=>{
+    html+=`<td style="text-align:center;padding:3px 2px">${s!==null?`<span style="font-size:10px;color:${s>=1.05?'#4a8c10':s>=0.85?'#888':'#c00'};font-family:var(--mono)">${s.toFixed(2)}</span>`:'<span style="color:#ddd;font-size:10px">–</span>'}</td>`;
+  });
+  html+='</tr>';
+  html+='</thead><tbody>';
+
+  // Meta enemies – row score before name
   ve.forEach((e,metaIdx)=>{
     const ei=G.enemies.indexOf(e);
     const isLast=metaIdx===ve.length-1&&extraLists.length;
     const lastStyle=isLast?'border-bottom:none':'';
-    html+=`<tr><td style="font-size:12px;padding:6px 4px;color:#555;white-space:nowrap;${lastStyle}">${e}</td>`;
+    const rowVals=sc.map((_,ci)=>{const v=G.matrix[mkey(li,ei,ci)]||'';return v?getPts(v):null;}).filter(v=>v!==null);
+    const rowScore=rowVals.length?rowVals.reduce((a,b)=>a+b,0)/rowVals.length:null;
+    const scoreSpan=rowScore!==null?`<span style="font-size:10px;color:${rowScore>=1.05?'#4a8c10':rowScore>=0.85?'#888':'#c00'};font-family:var(--mono);margin-right:5px">${rowScore.toFixed(2)}</span>`:'';
+    html+=`<tr><td style="font-size:12px;padding:6px 4px;color:#555;white-space:nowrap;${lastStyle}">${scoreSpan}${e}</td>`;
     sc.forEach((_,ci)=>{
       const key=mkey(li,ei,ci);const val=G.matrix[key]||'';
       html+=`<td style="${lastStyle}">${rSel(`mx_${li}_${ei}_${ci}`,val,`G.matrix['${key}']=this.value;_dirtyMatrixKeys.add('${key}');save()`)}</td>`;
     });
     html+='</tr>';
   });
-  // Extra enemies with dashed top border on first row
+
+  // Extra enemies – row score before name
   if(extraLists.length){
     extraLists.forEach((extra,xi)=>{
       const sep=xi===0&&ve.length?'border-top:1px solid #ccc':'';
-      html+=`<tr><td style="font-size:12px;padding:6px 4px;color:#888;white-space:nowrap;font-style:italic;${sep}">${extra}</td>`;
+      const rowVals=sc.map((_,ci)=>{const v=(G.extraMatrix||{})[`${li}_${xi}_${ci}`]||'';return v?getPts(v):null;}).filter(v=>v!==null);
+      const rowScore=rowVals.length?rowVals.reduce((a,b)=>a+b,0)/rowVals.length:null;
+      const scoreSpan=rowScore!==null?`<span style="font-size:10px;color:${rowScore>=1.05?'#4a8c10':rowScore>=0.85?'#888':'#c00'};font-family:var(--mono);margin-right:5px">${rowScore.toFixed(2)}</span>`:'';
+      html+=`<tr><td style="font-size:12px;padding:6px 4px;color:#888;white-space:nowrap;font-style:italic;${sep}">${scoreSpan}${extra}</td>`;
       sc.forEach((_,ci)=>{
         const key=`${li}_${xi}_${ci}`;
         const val=(G.extraMatrix||{})[key]||'';
