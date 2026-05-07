@@ -228,6 +228,16 @@ select:focus{outline:none;border-color:#6ab820}
     <div class="hint" style="margin-bottom:12px">Liste wählen → pro Gegner und Szenario bewerten.</div>
     <div class="inner-tabs" id="matrix-list-tabs"></div>
     <div id="matrix-content"></div>
+    <div class="section-h">Bewertungsskala</div>
+    <div class="card" style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:4px;font-size:12px">
+        <div style="display:flex;align-items:center;gap:4px;flex:1;justify-content:center"><span class="chip chip-kf">++</span><span style="color:#555;white-space:nowrap">Auto Win</span></div>
+        <div style="display:flex;align-items:center;gap:4px;flex:1;justify-content:center"><span class="chip chip-lf">+</span><span style="color:#555;white-space:nowrap">Vorteil</span></div>
+        <div style="display:flex;align-items:center;gap:4px;flex:1;justify-content:center"><span class="chip chip-50">0</span><span style="color:#555;white-space:nowrap">50/50</span></div>
+        <div style="display:flex;align-items:center;gap:4px;flex:1;justify-content:center"><span class="chip chip-lu">−</span><span style="color:#555;white-space:nowrap">Nachteil</span></div>
+        <div style="display:flex;align-items:center;gap:4px;flex:1;justify-content:center"><span class="chip chip-ku">−−</span><span style="color:#555;white-space:nowrap">Auto Loose</span></div>
+      </div>
+    </div>
     <div class="section-h">Gegner-Listen</div>
     <div class="card">
       <div class="card-title">Meta-Gegner</div>
@@ -987,11 +997,26 @@ function renderExtraEnemyInputs(){
       <button class="btn btn-sm btn-danger" onclick="removeExtraEnemy(${xi})">×</button>
     </div>`).join('');
 }
+function getCoverage(li){
+  const ve=getVE();const sc=getActiveSzenarien();
+  if(!ve.length||!sc.length)return 0;
+  const total=ve.length*sc.length;
+  const rated=ve.reduce((sum,_,ei)=>sum+sc.filter((_,ci)=>getR(li,ei,ci)!=='').length,0);
+  return total>0?rated/total:0;
+}
+function coverageSymbol(cov){
+  if(cov>=1.0)return'● ';
+  if(cov>=0.5)return'◑ ';
+  return'○ ';
+}
 function renderMatrixTabs(){
   const vc=getVC();if(matrixTab>=vc.length)matrixTab=0;
   const sc=getActiveSzenarien();
   document.getElementById('matrix-list-tabs').innerHTML=vc.map((c,ti)=>{
-    return`<div class="inner-tab${ti===matrixTab?' active':''}" onclick="matrixTab=${ti};renderMatrixTabs()">${c.name||'Liste '+(ti+1)}</div>`;
+    const li=G.candidates.indexOf(c);
+    const cov=getCoverage(li);
+    const sym=coverageSymbol(cov);
+    return`<div class="inner-tab${ti===matrixTab?' active':''}" onclick="matrixTab=${ti};renderMatrixTabs()" style="font-variant-numeric:tabular-nums">${sym}${c.name||'Liste '+(ti+1)}</div>`;
   }).join('');
   renderMatrixContent();
 }
@@ -1109,6 +1134,11 @@ function scoreCombo(combo){
     });
   });
   if(totalCells===0)return{sc,overall:null,minC:null,reliability:null,score:null};
+  // Coverage: fraction of possible cells that are actually rated
+  const totalPossible=combo.length*sc.length;
+  const coverage=totalPossible>0?totalCells/totalPossible:0;
+  // Only score combos with at least 30% coverage
+  if(coverage<0.3)return{sc,overall:null,minC:null,reliability:null,score:null};
   const reliability=reliableCells/totalCells;
   const score=reliability*0.6+(overall||1.0)*0.3+(minC||1.0)*0.1;
   return{sc,overall,minC,reliability,score};
@@ -1222,7 +1252,9 @@ function renderPortfolio(){
   const allC=getCombinations(vc,5);
   const valid=allC.filter(combo=>{
     const cov=new Set(combo.flatMap(c=>c.players));
-    return ap.every(({i})=>cov.has(i));
+    if(!ap.every(({i})=>cov.has(i)))return false;
+    // Every list must have at least one rating
+    return combo.every(c=>getCoverage(G.candidates.indexOf(c))>0);
   });
   if(!valid.length){out.innerHTML='<div class="box-err">Keine gültige Kombi – Spieler-Zuordnungen prüfen.</div>';return;}
   const sm=document.getElementById('sort-mode').value;
@@ -1236,19 +1268,36 @@ function renderPortfolio(){
   scored.slice(0,topN).forEach(({combo,s},rank)=>{
     const idxArr=combo.map(c=>G.candidates.indexOf(c));
     const isPicked=G.selectedCombo&&idxArr.every((x,i)=>G.selectedCombo[i]===x);
+    const pickedSet=new Set(G.selectedCombo||[]);
     const pct=Math.round(s.score/best*100);
     const comboId=`combo-${rank}`;
+    // Per-list avg score across all scenarios and enemies
+    const listRows=combo.map(c=>{
+      const li=G.candidates.indexOf(c);
+      const ve=getVE();const sc2=getActiveSzenarien();
+      const vals=[];
+      ve.forEach((_,ei)=>sc2.forEach((_,ci)=>{const v=getR(li,ei,ci);if(v)vals.push(getPts(v));}));
+      const avg=vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:null;
+      const cov=getCoverage(li);
+      const isInPicked=pickedSet.has(li);
+      return{c,li,avg,cov,isInPicked};
+    }).sort((a,b)=>(b.avg??-1)-(a.avg??-1)).map(({c,avg,isInPicked})=>{
+      const borderStyle=isInPicked?'border:1px solid #ddd;background:#fff':'border:1px solid #ddd;background:#f5f4f0';
+      const scoreColor=avg===null?'#ccc':avg>=1.05?'#4a8c10':avg>=0.85?'#888':'#c00';
+      return`<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;border-radius:6px;${borderStyle};margin-bottom:4px">
+        <span style="font-size:13px;font-weight:600;color:#1a1a1a">${c.name}</span>
+        <span style="font-size:12px;font-family:var(--mono);color:${scoreColor}">${avg!==null?Math.round(avg*100):'–'}</span>
+      </div>`;
+    }).join('');
     html+=`<div class="combo-card${isPicked?' picked':''}" onclick="pickCombo(${JSON.stringify(idxArr)})" style="cursor:pointer">
-      <div style="display:flex;justify-content:space-between;align-items:baseline">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">
         <span style="font-size:12px;color:#888;font-family:var(--mono)">#${rank+1}</span>
-        <span class="combo-score-num">${s.score.toFixed(2)}</span>
+        <span class="combo-score-num">${Math.round(s.score*100)}</span>
       </div>
-      <div class="score-bar" style="margin:8px 0"><div class="score-fill" style="width:${pct}%"></div></div>
-      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
-        ${combo.map(c=>`<span style="font-size:14px;font-weight:600;color:#1a1a1a;background:#eef7e0;border:1px solid #90c040;border-radius:6px;padding:4px 10px">${c.name}</span>`).join('')}
-      </div>
-      <div style="font-size:11px;color:#888;font-family:var(--mono)">
-        Verlässlichkeit ${s.reliability!==null?Math.round(s.reliability*100)+'%':'–'} · Ø${s.overall!==null?s.overall.toFixed(2):'–'} · Schwächstes ${s.minC!==null?s.minC.toFixed(2):'–'}
+      <div class="score-bar" style="margin:0 0 10px"><div class="score-fill" style="width:${pct}%"></div></div>
+      ${listRows}
+      <div style="font-size:11px;color:#888;font-family:var(--mono);margin-top:8px">
+        Verlässlichkeit ${s.reliability!==null?Math.round(s.reliability*100)+'%':'–'} · Ø${s.overall!==null?Math.round(s.overall*100):'–'} · Schwächstes ${s.minC!==null?Math.round(s.minC*100):'–'}
       </div>
       ${isPicked?'<div style="font-size:12px;color:#4a8c10;margin-top:8px;font-weight:600">✓ Gewählt</div>':''}
       <div id="heatmap-${comboId}" style="display:none;margin-top:12px"></div>
@@ -1263,19 +1312,10 @@ function renderPortfolio(){
     <div style="font-size:12px;color:#555;line-height:1.8;margin-bottom:12px">
       Der Score bewertet wie <strong>verlässlich</strong> eine Kombi über alle Szenarien funktioniert – nicht wie stark sie in einzelnen glänzt.
     </div>
-    <div style="display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:12px;margin-bottom:12px">
+    <div style="display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:12px;">
       <span style="font-weight:600;color:#555">60%</span><span style="color:#555">Verlässlichkeit – Anteil Szenarien mit 0 oder besser</span>
       <span style="font-weight:600;color:#555">30%</span><span style="color:#555">Gesamtdurchschnitt aller Listen × Szenarien</span>
       <span style="font-weight:600;color:#555">10%</span><span style="color:#555">Schwächstes Szenario (Malus für −− Häufungen)</span>
-    </div>
-    <div class="divider"></div>
-    <div class="label" style="margin-bottom:8px">Bewertungsskala</div>
-    <div style="display:flex;flex-direction:column;gap:6px;font-size:12px">
-      <div style="display:flex;align-items:center;gap:10px"><span class="chip chip-kf">++</span><span style="color:#555">Cool, aber nicht nötig – kleiner Bonus</span></div>
-      <div style="display:flex;align-items:center;gap:10px"><span class="chip chip-lf">+</span><span style="color:#555">Ziel – klar positiv</span></div>
-      <div style="display:flex;align-items:center;gap:10px"><span class="chip chip-50">0</span><span style="color:#555">Akzeptabel – neutral</span></div>
-      <div style="display:flex;align-items:center;gap:10px"><span class="chip chip-lu">−</span><span style="color:#555">Tolerierbar – leichter Malus</span></div>
-      <div style="display:flex;align-items:center;gap:10px"><span class="chip chip-ku">−−</span><span style="color:#555">Unerwünscht – sollte vermieden werden</span></div>
     </div>
   </div>`;
   out.innerHTML=html;
