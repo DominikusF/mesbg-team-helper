@@ -5,7 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>MESBG</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.26.0/dist/umd/supabase.min.js"></script>
 <style>
 :root{--r:10px;--r2:6px;--font:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;--mono:'Courier New',monospace}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
@@ -487,6 +487,7 @@ function subscribeRealtime(turnierId){
     .on('postgres_changes',{event:'UPDATE',schema:'public',table:'turniere',filter:`id=eq.${turnierId}`},
       payload=>{
         if(!payload.new?.data)return;
+        if(Date.now()-_lastSyncTime<2000)return;
         const remote=payload.new.data;
         const newMatrix=Object.assign({},remote.matrix||{});
         _dirtyMatrixKeys.forEach(k=>{newMatrix[k]=G.matrix[k];});
@@ -853,6 +854,12 @@ function avgForList(listName,scenarioName){
   if(!rated.length)return null;
   return rated.reduce((s,v)=>s+getPts(v),0)/rated.length;
 }
+function setMatrixVal(el,safeId){
+  const key=el.dataset.mkey||document.getElementById(safeId)?.dataset.mkey;
+  if(!key)return;
+  G.matrix[key]=el.value;
+  _dirtyMatrixKeys.add(key);
+}
 function chipCls(pts){if(pts>=1.6)return'kf';if(pts>=1.15)return'lf';if(pts>=0.85)return'50';if(pts>=0.4)return'lu';return'ku';}
 function chipLbl(c){return{kf:'++',lf:'+','50':'0',lu:'−',ku:'−−'}[c];}
 
@@ -1103,8 +1110,10 @@ function renderMatrixContent(){
     html+=`<tr><td style="font-size:12px;padding:6px 4px;white-space:nowrap;${nameStyle};${cellStyle}">${scoreSpan}${e}</td>`;
     sc.forEach(s=>{
       const key=mkey(listName,e,s);const val=G.matrix[key]||'';
-      const safeId='mx_'+btoa(key).replace(/[^a-z0-9]/gi,'_').slice(0,30);
-      html+=`<td style="${cellStyle}">${rSel(safeId,val,`G.matrix[${JSON.stringify(key)}]=this.value;_dirtyMatrixKeys.add(${JSON.stringify(key)});save()`)}</td>`;
+      const safeId='mx_'+btoa(unescape(encodeURIComponent(key))).replace(/[^a-z0-9]/gi,'_').slice(0,30);
+      html+=`<td style="${cellStyle}">${rSel(safeId,val,`setMatrixVal(this,'${safeId}');save()`)}</td>`;
+      // Store key mapping
+      html=html.replace(`id="${safeId}"`,`id="${safeId}" data-mkey="${key.replace(/"/g,'&quot;')}"`);
     });
     html+='</tr>';
   });
