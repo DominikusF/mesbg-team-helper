@@ -467,6 +467,7 @@ const ALL_LISTS=[
   'Army of Dunland','Far Harad','Fell Beings of Mirkwood','Ravagers of the Shire','The Spider Queen\'s Brood','Variags of Khand',
 ].sort();
 function getActiveSzenarien(){return(G.scenarios||[]).filter(n=>ALL_SCENARIOS.find(s=>s.name===n));}
+function getSortedSzenarien(){return getActiveSzenarien().sort((a,b)=>ALL_SCENARIOS.findIndex(s=>s.name===a)-ALL_SCENARIOS.findIndex(s=>s.name===b));}
 // Legacy shims so existing code still works
 function CATS_arr(){return getActiveSzenarien();}
 function CATS_S_arr(){return getActiveSzenarien().map(n=>n.length>12?n.slice(0,10)+'…':n);}
@@ -1043,7 +1044,7 @@ function renderMatrixTabs(){
 function renderMatrixContent(){
   const scrollPositions=Array.from(document.querySelectorAll('.matrix-wrap')).map(el=>el.scrollLeft);
   const vc=getVC();const ve=getVE();const wrap=document.getElementById('matrix-content');
-  const sc=getActiveSzenarien();
+  const sc=getSortedSzenarien();
   const extraLists=getExtraLists();
   if(!vc.length){wrap.innerHTML='<p class="hint">Erst Listen in Phase 2.</p>';return;}
   if(!sc.length){wrap.innerHTML='<p class="hint">Erst Szenarien in Phase 3 wählen.</p>';return;}
