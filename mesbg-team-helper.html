@@ -5,7 +5,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>MESBG</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/dist/umd/supabase.min.js"></script>
 <style>
 :root{--r:10px;--r2:6px;--font:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;--mono:'Courier New',monospace}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
@@ -481,17 +480,25 @@ const RATINGS=[
 const SK='mesbg_v1';
 const SB_URL='https://jovnqzxgjdewapkfitxw.supabase.co';
 const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impvdm5xenhnamRld2Fwa2ZpdHh3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc5MTI4MTEsImV4cCI6MjA5MzQ4ODgxMX0.WrNlcElTbHhcO3ux8ekpL_jhhiSbn3iSLnxP1ucrUHI';
-const sb=supabase.createClient(SB_URL,SB_KEY,{realtime:{enabled:false}});
+const sb=null;
 let currentTurnierId=null;
-let _realtimeChannel=null;
+let _realtimeWs=null;
 
 function subscribeRealtime(turnierId){
-  if(_realtimeChannel)sb.removeChannel(_realtimeChannel);
-  _realtimeChannel=sb.channel('turnier-'+turnierId)
-    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'turniere',filter:`id=eq.${turnierId}`},
-      payload=>{
-        if(!payload.new?.data)return;
-        const remote=payload.new.data;
+  if(_realtimeWs){try{_realtimeWs.close();}catch(e){}  _realtimeWs=null;}
+  const wsUrl=`wss://jovnqzxgjdewapkfitxw.supabase.co/realtime/v1/websocket?apikey=${SB_KEY}&vsn=1.0.0`;
+  try{
+    const ws=new WebSocket(wsUrl);
+    _realtimeWs=ws;
+    ws.onopen=()=>{
+      ws.send(JSON.stringify({topic:'realtime:public:turniere:id=eq.'+turnierId,event:'phx_join',payload:{config:{broadcast:{self:false},presence:{key:''},postgres_changes:[{event:'UPDATE',schema:'public',table:'turniere',filter:'id=eq.'+turnierId}]}},ref:'1'}));
+    };
+    ws.onmessage=e=>{
+      try{
+        const msg=JSON.parse(e.data);
+        if(msg.event!=='postgres_changes')return;
+        const remote=msg.payload?.data?.record?.data;
+        if(!remote)return;
         const newMatrix=Object.assign({},remote.matrix||{});
         _dirtyMatrixKeys.forEach(k=>{newMatrix[k]=G.matrix[k];});
         const preserveRound=G.currentRound;
@@ -515,7 +522,6 @@ function subscribeRealtime(turnierId){
           renderStrike();
           renderAttack();
           renderResults();
-          // Update static fields in turnier view
           const r=R();
           const catEl=document.getElementById('round-cat');
           if(catEl)catEl.value=r.scenario||'';
@@ -525,8 +531,12 @@ function subscribeRealtime(turnierId){
           renderDecision();
           renderDefend();
         }
-      })
-    .subscribe();
+      }catch(err){}
+    };
+    ws.onclose=()=>{
+      setTimeout(()=>{if(currentTurnierId===turnierId)subscribeRealtime(turnierId);},3000);
+    };
+  }catch(e){console.warn('Realtime connect failed:',e);}
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -588,7 +598,7 @@ function confirmReset(){
   closeBurger();
   if(confirm('Lokale Daten löschen? Cloud-Daten bleiben erhalten.')){
     localStorage.removeItem(SK);
-    if(_realtimeChannel)sb.removeChannel(_realtimeChannel);
+    if(_realtimeWs){try{_realtimeWs.close();}catch(e){}_realtimeWs=null;}
     currentTurnierId=null;
     location.hash='';
     location.reload();
