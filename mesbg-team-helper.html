@@ -54,18 +54,18 @@ body{font-family:var(--font);font-size:15px;min-height:100vh;padding-bottom:100p
 /* Content */
 .content{padding:16px;max-width:600px;margin:0 auto}
 @media(min-width:768px){
-#phase-3 .matrix-wrap,
-#phase-4 .matrix-wrap{
-width:100vw;
-position:relative;
-left:50%;
-transform:translateX(-50%);
-padding:0 32px;
-box-sizing:border-box;
-overflow-x:auto;
-}
-#phase-3 .matrix-table,
-#phase-4 .matrix-table{width:100%}
+  #phase-3 .matrix-wrap,
+  #phase-4 .matrix-wrap{
+    width:100vw;
+    position:relative;
+    left:50%;
+    transform:translateX(-50%);
+    padding:0 32px;
+    box-sizing:border-box;
+    overflow-x:auto;
+  }
+  #phase-3 .matrix-table,
+  #phase-4 .matrix-table{width:100%}
 }
 .mode-panel{display:none}.mode-panel.active{display:block}
 .view{display:none}.view.active{display:block}
@@ -243,10 +243,8 @@ select:focus{outline:none;border-color:#6ab820}
       <div id="enemy-inputs"></div>
       <button class="btn btn-sm" onclick="addEnemy()" style="margin-top:4px">+ Meta-Gegner hinzufügen</button>
       <div class="divider"></div>
-      <div class="card-title">Extra-Listen</div>
-      <div class="hint" style="margin-bottom:10px">Listen die nicht im Meta stehen aber bei Turnier-Teams vorkommen.</div>
+      <div class="card-title">Extra-Listen <span style="font-size:11px;color:#888;font-weight:400">(aus Turnier-Teams)</span></div>
       <div id="extra-enemy-inputs"></div>
-      <button class="btn btn-sm" onclick="addExtraEnemy()" style="margin-top:4px">+ Extra-Liste hinzufügen</button>
     </div>
     <div class="nav-footer">
       <button class="btn" onclick="goPhase(2)">← Zurück</button>
@@ -442,6 +440,32 @@ const ALL_SCENARIOS=[
   {pool:5,name:'Reconnoitre'},{pool:5,name:'Storm the Camp'},{pool:5,name:'Divide & Conquer'},{pool:5,name:'Escort the Wounded'},
   {pool:6,name:'Fog of War'},{pool:6,name:'Clash by Moonlight'},{pool:6,name:'Lead from the Front'},{pool:6,name:'Convergence'},
 ];
+const ALL_LISTS=[
+  // Good
+  'Arathorn\'s Stand','Army of Dale','Army of Edoras','Army of Erebor','Army of Lake-town','Army of Thror',
+  'Arnor','Assault on Ravenhill','Atop the Wall','Battle of Bywater','The Battle of Five Armies','Battle of Fornost',
+  'The Beornings','Breaking of the Fellowship','Defenders of Erebor','Defenders of Helm\'s Deep',
+  'Defenders of the Hornburg','Defenders of the Pelennor','The Eagles','Erebor & Dale','Erebor Reclaimed',
+  'Fangorn','The Fellowship','The Fiefdoms','Fords of Isen','Garrison of Dale','Garrison of Ithilien',
+  'The Grey Company','The Grief of Eomer','Halls of Thranduil','The Iron Hills','Kingdom of Khazad-dum',
+  'Kingdom of Rohan','The Last Alliance','Lindon','Lothlorien','Men of the West','Minas Tirith','Numenor',
+  'Paths of the Druadan','Radagast\'s Alliance','Rangers of Mirkwood','Realms of Men','Reclamation of Osgiliath',
+  'Return of the King','Ride Out','Riders of Eomer','Riders of Theoden','Rivendell','Road to Helm\'s Deep',
+  'Road to Rivendell','The Shire','Survivors of Lake-town','Thorin\'s Company','The White Council',
+  // Evil
+  'Army of Carn Dum','Army of Gothmog','Army of Gundabad','Army of the Great Eye','Army of the White Hand',
+  'Assault Upon Helm\'s Deep','Azog\'s Hunters','Barad-Dur','Besiegers of the Hornburg','The Black Gate',
+  'The Black Riders','Buhrdur\'s Horde','Cirith Ungol','Corsair Fleets','Depths of Moria',
+  'Desolator of the North','Dragons of the North','The Easterlings','Goblin-Town','Grand Army of the South',
+  'Harad','Host of the Dragon Emperor','Host of the Witch-King','Legions of Mordor','Lurtz\'s Scouts',
+  'Minas Morgul','Moria','Muster of Isengard','Pits of Dol Guldur','Rise of the Necromancer',
+  'The Serpent Horde','Shadows of Angmar','Sharkey\'s Rogues','The Three Trolls','Ugluk\'s Scouts',
+  'Umbar','Usurpers of Edoras','Wolf Pack of Angmar','Wolves of Isengard','Wraiths on Wings'
+  // Legacy Good
+  'Assault on Lothlórien','Battle of Greenfields','Expedition to the East','Fields of Celebrant','Reclamation of Moria',
+  // Legacy Evil
+  'Army of Dunland','Far Harad','Fell Beings of Mirkwood','Ravagers of the Shire','The Spider Queen\'s Brood','Variags of Khand',
+].sort();
 function getActiveSzenarien(){return(G.scenarios||[]).filter(n=>ALL_SCENARIOS.find(s=>s.name===n));}
 // Legacy shims so existing code still works
 function CATS_arr(){return getActiveSzenarien();}
@@ -469,13 +493,10 @@ function subscribeRealtime(turnierId){
         const remote=payload.new.data;
         const newMatrix=Object.assign({},remote.matrix||{});
         _dirtyMatrixKeys.forEach(k=>{newMatrix[k]=G.matrix[k];});
-        const newExtraMatrix=Object.assign({},remote.extraMatrix||{});
-        _dirtyExtraMatrixKeys.forEach(k=>{newExtraMatrix[k]=G.extraMatrix[k];});
         const preserveRound=G.currentRound;
         Object.assign(G,remote);
         G.currentRound=preserveRound;
         G.matrix=newMatrix;
-        G.extraMatrix=newExtraMatrix;
         saveLocal();
         const scrollPositions=Array.from(document.querySelectorAll('.matrix-wrap')).map(el=>el.scrollLeft);
         renderMatrixContent();
@@ -519,9 +540,7 @@ let G={
   matrix:{},
   selectedCombo:null,
   tourneyTeams:[],
-  scenarios:[], // selected scenario names
-  extraLists:[], // non-meta lists used across tourney teams
-  extraMatrix:{}, // key: li_ei_ci where li=extraList index, ei=enemy index, ci=scenario index
+  scenarios:[],
   // Turnier
   currentRound:0,
   rounds:[{
@@ -541,7 +560,6 @@ let matrixTab=0;
 // ══════════════════════════════════════════════════════════════════
 function saveLocal(){localStorage.setItem(SK,JSON.stringify(G));}
 let _dirtyMatrixKeys=new Set();
-let _dirtyExtraMatrixKeys=new Set();
 let _dirty=false;
 let _syncTimer=null;
 function save(){
@@ -560,8 +578,6 @@ function load(){
     if(d.selectedCombo!==undefined)G.selectedCombo=d.selectedCombo;
     if(d.tourneyTeams)G.tourneyTeams=d.tourneyTeams;
     if(d.scenarios)G.scenarios=d.scenarios;
-    if(d.extraLists)G.extraLists=d.extraLists;
-    if(d.extraMatrix)G.extraMatrix=d.extraMatrix;
     if(d.currentRound!==undefined)G.currentRound=d.currentRound;
     if(d.rounds)G.rounds=d.rounds;
   }catch(e){}
@@ -592,7 +608,7 @@ async function newTurnier(){
   showToast('Turnier wird angelegt…');
   const emptyG={
     players:['','','',''],teamName:'',candidates:[],enemies:[],matrix:{},
-    selectedCombo:null,tourneyTeams:[],scenarios:[],extraLists:[],extraMatrix:{},
+    selectedCombo:null,tourneyTeams:[],scenarios:[],
     currentRound:0,rounds:[{
       scenario:'',oppName:'',oppLists:['','','','',''],teamIdx:-1,oppStruck:'',myStruck:'',
       oppAttacker:'',attacker:'',pool:'',defA:'',defB:'',mRatings:{},
@@ -688,16 +704,12 @@ async function syncToCloud(){
     const merged=Object.assign({},remote,{
       players:G.players,teamName:G.teamName,candidates:G.candidates,
       enemies:G.enemies,selectedCombo:G.selectedCombo,tourneyTeams:G.tourneyTeams,
-      scenarios:G.scenarios,extraLists:G.extraLists,rounds:G.rounds
+      scenarios:G.scenarios,rounds:G.rounds
     });
     const mergedMatrix=Object.assign({},remote.matrix||{});
     _dirtyMatrixKeys.forEach(k=>{ mergedMatrix[k]=G.matrix[k]; });
-    const mergedExtraMatrix=Object.assign({},remote.extraMatrix||{});
-    _dirtyExtraMatrixKeys.forEach(k=>{ mergedExtraMatrix[k]=G.extraMatrix[k]; });
     merged.matrix=mergedMatrix;
-    merged.extraMatrix=mergedExtraMatrix;
     _dirtyMatrixKeys.clear();
-    _dirtyExtraMatrixKeys.clear();
     await fetch(sbUrl()+'?id=eq.'+currentTurnierId,{
       method:'PATCH',
       headers:{...SB_HEADERS,'Prefer':'return=minimal'},
@@ -803,28 +815,45 @@ function setMode(mode){
 // ══════════════════════════════════════════════════════════════════
 // HELPERS
 // ══════════════════════════════════════════════════════════════════
-function mkey(li,ei,ci){return`${li}_${ei}_${ci}`;}
+function mkey(listName,enemyName,scenarioName){return`${listName}||${enemyName}||${scenarioName}`;}
 function getPts(r){return RATINGS.find(x=>x.val===r)?.pts??1.0;}
-function getR(li,ei,ci){return G.matrix[mkey(li,ei,ci)]||'';}
+function getR(listName,enemyName,scenarioName){return G.matrix[mkey(listName,enemyName,scenarioName)]||'';}
 function getVC(){return G.candidates.filter(c=>c.name.trim());}
 function getVE(){return G.enemies.filter(e=>e.trim());}
 function getAP(){return G.players.map((p,i)=>({p,i})).filter(x=>x.p.trim());}
 function R(){return G.rounds[G.currentRound];}
+// Derive extra lists from tourney teams (lists not in meta enemies)
+function getExtraLists(){
+  const metaSet=new Set(getVE());
+  const extras=new Set();
+  G.tourneyTeams.forEach(t=>t.lists.forEach(l=>{
+    const name=getTTName(l);
+    if(name&&!metaSet.has(name))extras.add(name);
+  }));
+  return [...extras];
+}
 
-function avgForCand(li,ci){
+function avgForCand(listName,scenarioName){
   const ve=getVE();if(!ve.length)return null;
-  const rated=ve.map(e=>getR(li,G.enemies.indexOf(e),ci)).filter(v=>v!=='');
+  const rated=ve.map(e=>getR(listName,e,scenarioName)).filter(v=>v!=='');
   if(!rated.length)return null;
   return rated.reduce((s,v)=>s+getPts(v),0)/rated.length;
 }
-function avgForList(li,ci){
+function avgForList(listName,scenarioName){
   const ve=G.enemies.filter(e=>e.trim());if(!ve.length)return null;
-  const rated=ve.map((_,ei)=>getR(li,ei,ci)).filter(v=>v!=='');
+  const rated=ve.map(e=>getR(listName,e,scenarioName)).filter(v=>v!=='');
   if(!rated.length)return null;
   return rated.reduce((s,v)=>s+getPts(v),0)/rated.length;
 }
 function chipCls(pts){if(pts>=1.6)return'kf';if(pts>=1.15)return'lf';if(pts>=0.85)return'50';if(pts>=0.4)return'lu';return'ku';}
 function chipLbl(c){return{kf:'++',lf:'+','50':'0',lu:'−',ku:'−−'}[c];}
+function getCoverage(listName){
+  const ve=getVE();const sc=getActiveSzenarien();
+  if(!ve.length||!sc.length)return 0;
+  const total=ve.length*sc.length;
+  const rated=ve.reduce((sum,e)=>sum+sc.filter(s=>getR(listName,e,s)!=='').length,0);
+  return total>0?rated/total:0;
+}
 
 function rSel(id,val,onch){
   return`<select class="rating-sel r-${val||'empty'}" id="${id}" onchange="${onch};this.className='rating-sel r-'+this.value">
@@ -896,17 +925,13 @@ function renderPlayers(){
 
 // Candidates
 function removeCandidate(i){
-  const newMatrix={};
+  const name=G.candidates[i].name;
+  // Remove all matrix keys for this list
   Object.keys(G.matrix).forEach(key=>{
-    const parts=key.split('_');
-    const li=parseInt(parts[0]),ei=parseInt(parts[1]),ci=parseInt(parts[2]);
-    if(li===i)return;
-    if(li>i){newMatrix[mkey(li-1,ei,ci)]=G.matrix[key];}
-    else{newMatrix[key]=G.matrix[key];}
+    if(key.startsWith(name+'||'))delete G.matrix[key];
   });
-  G.matrix=newMatrix;
   G.candidates.splice(i,1);
-  if(G.selectedCombo)G.selectedCombo=null; // invalidate combo
+  if(G.selectedCombo)G.selectedCombo=null;
   save();renderCandidates();renderMatrixTabs();
 }
 function addCandidate(){G.candidates.push({name:'',players:[]});save();renderCandidates();}
@@ -915,8 +940,10 @@ function renderCandidates(){
   document.getElementById('candidate-list').innerHTML=G.candidates.map((c,i)=>`
     <div class="list-row">
       <div style="display:flex;gap:8px;margin-bottom:10px">
-        <input type="text" value="${c.name}" placeholder="Listenname..." style="flex:1"
-          oninput="G.candidates[${i}].name=this.value;saveLocal();renderMatrixTabs()" onblur="save()">
+        <select style="flex:1" onchange="renameCandidate(${i},this.value)">
+          <option value="">– Liste wählen –</option>
+          ${ALL_LISTS.map(l=>`<option value="${l}"${c.name===l?' selected':''}>${l}</option>`).join('')}
+        </select>
         <button class="btn btn-sm btn-danger" onclick="removeCandidate(${i})">×</button>
       </div>
       <div class="label" style="margin-bottom:6px">Spieler</div>
@@ -925,6 +952,21 @@ function renderCandidates(){
       </div>
     </div>`).join('');
 }
+function renameCandidate(i,newName){
+  const oldName=G.candidates[i].name;
+  if(oldName===newName)return;
+  // Rename all matrix keys
+  const newMatrix={};
+  Object.keys(G.matrix).forEach(key=>{
+    const parts=key.split('||');
+    if(parts[0]===oldName)newMatrix[mkey(newName,parts[1],parts[2])]=G.matrix[key];
+    else newMatrix[key]=G.matrix[key];
+  });
+  G.matrix=newMatrix;
+  G.candidates[i].name=newName;
+  if(G.selectedCombo)G.selectedCombo=null;
+  save();renderCandidates();renderMatrixTabs();
+}
 function toggleCP(ci,pi){
   const idx=G.candidates[ci].players.indexOf(pi);
   if(idx>=0)G.candidates[ci].players.splice(idx,1);else G.candidates[ci].players.push(pi);
@@ -932,77 +974,58 @@ function toggleCP(ci,pi){
 }
 
 // Enemies + Matrix
-function removeEnemy(i){
-  const name=G.enemies[i];
-  const newMatrix={};
+function removeEnemy(name){
+  // Remove all matrix keys for this enemy
   Object.keys(G.matrix).forEach(key=>{
-    const parts=key.split('_');
-    const li=parseInt(parts[0]),ei=parseInt(parts[1]),ci=parseInt(parts[2]);
-    if(ei===i)return;
-    if(ei>i){newMatrix[mkey(li,ei-1,ci)]=G.matrix[key];}
-    else{newMatrix[key]=G.matrix[key];}
+    const parts=key.split('||');
+    if(parts[1]===name)delete G.matrix[key];
   });
-  G.matrix=newMatrix;
-  // clean team entries pointing to this meta list
-  G.tourneyTeams.forEach(team=>{
-    team.lists=team.lists.map(l=>
-      l.type==='meta'&&l.val===name?{type:'meta',val:'',manual:''}:l
-    );
-  });
-  G.enemies.splice(i,1);
+  G.enemies=G.enemies.filter(e=>e!==name);
   save();renderEnemies();renderMatrixContent();
 }
-function addEnemy(){G.enemies.push('');save();renderEnemies();renderMatrixTabs();}
+function toggleEnemy(name){
+  const idx=G.enemies.indexOf(name);
+  if(idx>=0)removeEnemy(name);
+  else{G.enemies.push(name);save();renderEnemies();renderMatrixTabs();}
+}
 function renderEnemies(){
-  document.getElementById('enemy-inputs').innerHTML=G.enemies.map((e,i)=>`
+  const active=G.enemies;
+  document.getElementById('enemy-inputs').innerHTML=active.map((e,i)=>`
     <div class="row">
-      <input type="text" value="${e}" placeholder="z.B. Mordor Ringwraiths..."
-        oninput="G.enemies[${i}]=this.value;saveLocal();renderMatrixContent()" onblur="save()">
-      <button class="btn btn-sm btn-danger" onclick="removeEnemy(${i})">×</button>
+      <select onchange="renameEnemy(${i},this.value)" style="flex:1">
+        <option value="">– Liste wählen –</option>
+        ${ALL_LISTS.map(l=>`<option value="${l}"${e===l?' selected':''}>${l}</option>`).join('')}
+      </select>
+      <button class="btn btn-sm btn-danger" onclick="removeEnemy('${e.replace(/'/g,"\\'")}')">×</button>
     </div>`).join('');
 }
-function addExtraEnemy(){
-  if(!G.extraLists)G.extraLists=[];
-  G.extraLists.push('');
-  save();renderExtraEnemyInputs();renderMatrixContent();
-}
-function removeExtraEnemy(xi){
-  const name=G.extraLists[xi];
+function addEnemy(){G.enemies.push('');save();renderEnemies();renderMatrixTabs();}
+function renameEnemy(i,newName){
+  const oldName=G.enemies[i];
+  if(oldName===newName)return;
+  // Rename matrix keys
   const newMatrix={};
-  Object.keys(G.extraMatrix||{}).forEach(key=>{
-    const parts=key.split('_');
-    const li=parseInt(parts[0]),eiN=parseInt(parts[1]),ci=parseInt(parts[2]);
-    if(eiN===xi)return;
-    if(eiN>xi)newMatrix[`${li}_${eiN-1}_${ci}`]=(G.extraMatrix||{})[key];
-    else newMatrix[key]=(G.extraMatrix||{})[key];
+  Object.keys(G.matrix).forEach(key=>{
+    const parts=key.split('||');
+    if(parts[1]===oldName)newMatrix[mkey(parts[0],newName,parts[2])]=G.matrix[key];
+    else newMatrix[key]=G.matrix[key];
   });
-  G.extraMatrix=newMatrix;
-  G.tourneyTeams.forEach(team=>{
-    team.lists=team.lists.map(l=>
-      l.type==='extra'&&l.val===name?{type:'meta',val:'',manual:''}:l
-    );
-  });
-  G.extraLists.splice(xi,1);
-  save();renderExtraEnemyInputs();renderMatrixContent();renderTourneyTeams();
+  G.matrix=newMatrix;
+  G.enemies[i]=newName;
+  save();renderEnemies();renderMatrixContent();
 }
 function renderExtraEnemyInputs(){
   const wrap=document.getElementById('extra-enemy-inputs');
   if(!wrap)return;
-  const extras=(G.extraLists||[]);
-  wrap.innerHTML=extras.map((e,xi)=>`
-    <div class="row">
-      <input type="text" value="${e}" placeholder="z.B. Rivendell Host..."
-        oninput="G.extraLists[${xi}]=this.value;saveLocal();renderMatrixContent()" onblur="save()">
-      <button class="btn btn-sm btn-danger" onclick="removeExtraEnemy(${xi})">×</button>
-    </div>`).join('');
+  const extras=getExtraLists();
+  wrap.innerHTML=extras.length
+    ?extras.map(e=>`<div class="tag" style="margin:2px">${e}</div>`).join('')
+    :'<p class="hint">Ergeben sich automatisch aus den Turnier-Teams.</p>';
 }
-function getCoverage(li){
-  const ve=getVE();const sc=getActiveSzenarien();
-  if(!ve.length||!sc.length)return 0;
-  const total=ve.length*sc.length;
-  const rated=ve.reduce((sum,_,ei)=>sum+sc.filter((_,ci)=>getR(li,ei,ci)!=='').length,0);
-  return total>0?rated/total:0;
-}
+function removeExtraList(xi){/* no-op: extra lists are auto-derived */}
+function removeExtraEnemy(xi){/* no-op: extra lists are auto-derived */}
+function addExtraEnemy(){/* no-op */}
+function confirmAddExtraList(){/* no-op */}
 function coverageSymbol(cov){
   if(cov>=1.0)return'● ';
   if(cov>=0.5)return'◑ ';
@@ -1010,12 +1033,10 @@ function coverageSymbol(cov){
 }
 function renderMatrixTabs(){
   const vc=getVC();if(matrixTab>=vc.length)matrixTab=0;
-  const sc=getActiveSzenarien();
   document.getElementById('matrix-list-tabs').innerHTML=vc.map((c,ti)=>{
-    const li=G.candidates.indexOf(c);
-    const cov=getCoverage(li);
+    const cov=getCoverage(c.name);
     const sym=coverageSymbol(cov);
-    return`<div class="inner-tab${ti===matrixTab?' active':''}" onclick="matrixTab=${ti};renderMatrixTabs()" style="font-variant-numeric:tabular-nums">${sym}${c.name||'Liste '+(ti+1)}</div>`;
+    return`<div class="inner-tab${ti===matrixTab?' active':''}" onclick="matrixTab=${ti};renderMatrixTabs()">${sym}${c.name||'Liste '+(ti+1)}</div>`;
   }).join('');
   renderMatrixContent();
 }
@@ -1023,34 +1044,22 @@ function renderMatrixContent(){
   const scrollPositions=Array.from(document.querySelectorAll('.matrix-wrap')).map(el=>el.scrollLeft);
   const vc=getVC();const ve=getVE();const wrap=document.getElementById('matrix-content');
   const sc=getActiveSzenarien();
+  const extraLists=getExtraLists();
   if(!vc.length){wrap.innerHTML='<p class="hint">Erst Listen in Phase 2.</p>';return;}
   if(!sc.length){wrap.innerHTML='<p class="hint">Erst Szenarien in Phase 3 wählen.</p>';return;}
+  if(!ve.length&&!extraLists.length){wrap.innerHTML='<p class="hint">Erst Gegner-Listen unten eintragen.</p>';return;}
   if(matrixTab>=vc.length)matrixTab=0;
-  const c=vc[matrixTab];const li=G.candidates.indexOf(c);
-  const extraLists=(G.extraLists||[]).filter(e=>e.trim());
-  const hasAny=ve.length||extraLists.length;
-  if(!hasAny){wrap.innerHTML='<p class="hint">Erst Gegner-Listen unten eintragen.</p>';return;}
-  // Helper: score for a single cell average
-  const allEnemies=[...ve.map((_,i)=>({type:'meta',i})),...extraLists.map((_,i)=>({type:'extra',i}))];
+  const listName=vc[matrixTab].name;
+  const allEnemies=[...ve.map(e=>({name:e,isExtra:false})),...extraLists.map(e=>({name:e,isExtra:true}))];
 
-  // Total score (C) – avg over all rated cells
-  const allCellVals=[];
-  allEnemies.forEach(({type,i:ei})=>{
-    sc.forEach((_,ci)=>{
-      const v=type==='meta'?G.matrix[mkey(li,ei,ci)]||'':(G.extraMatrix||{})[`${li}_${ei}_${ci}`]||'';
-      if(v)allCellVals.push(getPts(v));
-    });
-  });
+  // Total score
+  const allCellVals=allEnemies.flatMap(({name:e})=>sc.map(s=>{const v=getR(listName,e,s);return v?getPts(v):null;}).filter(v=>v!==null));
   const totalScore=allCellVals.length?allCellVals.reduce((a,b)=>a+b,0)/allCellVals.length:null;
-  const totalCls=totalScore!==null?chipCls(totalScore):'50';
   const totalLbl=totalScore!==null?totalScore.toFixed(2):'–';
 
-  // Column scores (B) – avg per scenario
-  const colScores=sc.map((_,ci)=>{
-    const vals=allEnemies.map(({type,i:ei})=>{
-      const v=type==='meta'?G.matrix[mkey(li,ei,ci)]||'':(G.extraMatrix||{})[`${li}_${ei}_${ci}`]||'';
-      return v?getPts(v):null;
-    }).filter(v=>v!==null);
+  // Column scores
+  const colScores=sc.map(s=>{
+    const vals=allEnemies.map(({name:e})=>{const v=getR(listName,e,s);return v?getPts(v):null;}).filter(v=>v!==null);
     return vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:null;
   });
 
@@ -1058,47 +1067,29 @@ function renderMatrixContent(){
   html+=`<th class="rh" style="font-weight:400;color:#888;font-size:11px">Gegner</th>`;
   sc.forEach(s=>html+=`<th style="min-width:80px">${s.length>12?s.slice(0,11)+'…':s}</th>`);
   html+='</tr>';
-  // B+C: column scores row with total score on left
   html+='<tr style="background:#fafaf8">';
   html+=`<td style="padding:3px 4px">${totalScore!==null?`<span style="font-size:10px;color:${totalScore>=1.05?'#4a8c10':totalScore>=0.85?'#888':'#c00'};font-family:var(--mono);font-weight:600">${totalLbl}</span>`:'<span style="color:#ddd;font-size:10px">–</span>'}</td>`;
   colScores.forEach(s=>{
     html+=`<td style="text-align:center;padding:3px 2px">${s!==null?`<span style="font-size:10px;color:${s>=1.05?'#4a8c10':s>=0.85?'#888':'#c00'};font-family:var(--mono)">${s.toFixed(2)}</span>`:'<span style="color:#ddd;font-size:10px">–</span>'}</td>`;
   });
-  html+='</tr>';
-  html+='</thead><tbody>';
+  html+='</tr></thead><tbody>';
 
-  // Meta enemies – row score before name
-  ve.forEach((e,metaIdx)=>{
-    const ei=G.enemies.indexOf(e);
-    const isLast=metaIdx===ve.length-1&&extraLists.length;
-    const lastStyle=isLast?'border-bottom:none':'';
-    const rowVals=sc.map((_,ci)=>{const v=G.matrix[mkey(li,ei,ci)]||'';return v?getPts(v):null;}).filter(v=>v!==null);
+  allEnemies.forEach(({name:e,isExtra},idx)=>{
+    const isLastMeta=!isExtra&&idx===ve.length-1&&extraLists.length;
+    const sep=isExtra&&idx===ve.length?'border-top:1px solid #ccc':'';
+    const lastStyle=isLastMeta?'border-bottom:none':'';
+    const rowVals=sc.map(s=>{const v=getR(listName,e,s);return v?getPts(v):null;}).filter(v=>v!==null);
     const rowScore=rowVals.length?rowVals.reduce((a,b)=>a+b,0)/rowVals.length:null;
     const scoreSpan=rowScore!==null?`<span style="font-size:10px;color:${rowScore>=1.05?'#4a8c10':rowScore>=0.85?'#888':'#c00'};font-family:var(--mono);margin-right:5px">${rowScore.toFixed(2)}</span>`:'';
-    html+=`<tr><td style="font-size:12px;padding:6px 4px;color:#555;white-space:nowrap;${lastStyle}">${scoreSpan}${e}</td>`;
-    sc.forEach((_,ci)=>{
-      const key=mkey(li,ei,ci);const val=G.matrix[key]||'';
-      html+=`<td style="${lastStyle}">${rSel(`mx_${li}_${ei}_${ci}`,val,`G.matrix['${key}']=this.value;_dirtyMatrixKeys.add('${key}');save()`)}</td>`;
+    const nameStyle=isExtra?'font-style:italic;color:#888':'color:#555';
+    const cellStyle=sep||lastStyle;
+    html+=`<tr><td style="font-size:12px;padding:6px 4px;white-space:nowrap;${nameStyle};${cellStyle}">${scoreSpan}${e}</td>`;
+    sc.forEach(s=>{
+      const key=mkey(listName,e,s);const val=G.matrix[key]||'';
+      html+=`<td style="${cellStyle}">${rSel(`mx_${listName}_${e}_${s}`.replace(/[^a-z0-9_]/gi,'_'),val,`G.matrix[${JSON.stringify(key)}]=this.value;_dirtyMatrixKeys.add(${JSON.stringify(key)});save()`)}</td>`;
     });
     html+='</tr>';
   });
-
-  // Extra enemies – row score before name
-  if(extraLists.length){
-    extraLists.forEach((extra,xi)=>{
-      const sep=xi===0&&ve.length?'border-top:1px solid #ccc':'';
-      const rowVals=sc.map((_,ci)=>{const v=(G.extraMatrix||{})[`${li}_${xi}_${ci}`]||'';return v?getPts(v):null;}).filter(v=>v!==null);
-      const rowScore=rowVals.length?rowVals.reduce((a,b)=>a+b,0)/rowVals.length:null;
-      const scoreSpan=rowScore!==null?`<span style="font-size:10px;color:${rowScore>=1.05?'#4a8c10':rowScore>=0.85?'#888':'#c00'};font-family:var(--mono);margin-right:5px">${rowScore.toFixed(2)}</span>`:'';
-      html+=`<tr><td style="font-size:12px;padding:6px 4px;color:#888;white-space:nowrap;font-style:italic;${sep}">${scoreSpan}${extra}</td>`;
-      sc.forEach((_,ci)=>{
-        const key=`${li}_${xi}_${ci}`;
-        const val=(G.extraMatrix||{})[key]||'';
-        html+=`<td style="${sep}">${rSel(`exmx_${li}_${xi}_${ci}`,val,`updExtraMatrix(${li},${xi},${ci},this.value);_dirtyExtraMatrixKeys.add('${li}_${xi}_${ci}')`)}</td>`;
-      });
-      html+='</tr>';
-    });
-  }
   html+='</tbody></table></div>';wrap.innerHTML=html;
   document.querySelectorAll('.matrix-wrap').forEach((el,i)=>{if(scrollPositions[i])el.scrollLeft=scrollPositions[i];});
 }
@@ -1111,32 +1102,27 @@ function getCombinations(arr,k){
 }
 function scoreCombo(combo){
   const sc=getActiveSzenarien();
-  const n=sc.length||1;
-  const catAvgs=sc.map((_,ci)=>{
-    const avgs=combo.map(c=>avgForCand(G.candidates.indexOf(c),ci)).filter(v=>v!==null);
+  const catAvgs=sc.map(s=>{
+    const avgs=combo.map(c=>avgForCand(c.name,s)).filter(v=>v!==null);
     if(!avgs.length)return null;
     return avgs.reduce((a,b)=>a+b,0)/avgs.length;
   }).filter(v=>v!==null);
   const overall=catAvgs.length?catAvgs.reduce((a,b)=>a+b,0)/catAvgs.length:null;
   const minC=catAvgs.length?Math.min(...catAvgs):null;
-  // reliability = fraction of rated list×scenario combos with value >= 1.0
   let totalCells=0,reliableCells=0;
   combo.forEach(c=>{
-    const li=G.candidates.indexOf(c);
-    sc.forEach((_,ci)=>{
-      const ve=getVE();
-      const rated=ve.map((_,ei)=>getR(li,G.enemies.indexOf(ve[ei]),ci)).filter(v=>v!=='');
+    const ve=getVE();
+    sc.forEach(s=>{
+      const rated=ve.map(e=>getR(c.name,e,s)).filter(v=>v!=='');
       if(!rated.length)return;
       totalCells++;
-      const avg=rated.reduce((s,v)=>s+getPts(v),0)/rated.length;
+      const avg=rated.reduce((sum,v)=>sum+getPts(v),0)/rated.length;
       if(avg>=1.0)reliableCells++;
     });
   });
   if(totalCells===0)return{sc,overall:null,minC:null,reliability:null,score:null};
-  // Coverage: fraction of possible cells that are actually rated
   const totalPossible=combo.length*sc.length;
   const coverage=totalPossible>0?totalCells/totalPossible:0;
-  // Only score combos with at least 30% coverage
   if(coverage<0.3)return{sc,overall:null,minC:null,reliability:null,score:null};
   const reliability=reliableCells/totalCells;
   const score=reliability*0.6+(overall||1.0)*0.3+(minC||1.0)*0.1;
@@ -1161,15 +1147,10 @@ function buildHeatmap(idxArr, customEnemies){
   if(!ve.length||!sc.length)return'<p class="hint">Keine Daten.</p>';
   const uid='hm_'+idxArr.join('_')+(customEnemies?'_tt':'');
 
-  const cellAvg=(ei,ci)=>{
+  const cellAvg=(eName,sName)=>{
     const vals=combo.map(c=>{
-      const li=G.candidates.indexOf(c);
-      const eName=ve[ei];
-      const metaEi=G.enemies.indexOf(eName);
-      if(metaEi>=0){const v=getR(li,metaEi,ci);return v?getPts(v):null;}
-      const xi=(G.extraLists||[]).indexOf(eName);
-      if(xi>=0){const v=(G.extraMatrix||{})[`${li}_${xi}_${ci}`];return v?getPts(v):null;}
-      return null;
+      const v=getR(c.name,eName,sName);
+      return v?getPts(v):null;
     }).filter(v=>v!==null);
     return vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:null;
   };
@@ -1197,13 +1178,13 @@ function buildHeatmap(idxArr, customEnemies){
     <table style="border-collapse:separate;border-spacing:2px">
       <tbody>`;
 
-  ve.forEach((e,ei)=>{
+  ve.forEach((e)=>{
     html+=`<tr>`;
-    sc.forEach((_,ci)=>{
-      const avg=cellAvg(ei,ci);
+    sc.forEach((s)=>{
+      const avg=cellAvg(e,s);
       const col=cellColor(avg);
       const label=ratingLabel(avg);
-      html+=`<td onclick="event.stopPropagation();showHmInfo('${uid}','${sc[ci].replace(/'/g,"\\'")}','${e.replace(/'/g,"\\'")}','${label}')"
+      html+=`<td onclick="event.stopPropagation();showHmInfo('${uid}','${s.replace(/'/g,"\\'")}','${e.replace(/'/g,"\\'")}','${label}')"
         style="width:18px;height:18px;min-width:18px;background:${col};border-radius:3px;cursor:pointer"></td>`;
     });
     html+=`</tr>`;
@@ -1214,15 +1195,15 @@ function buildHeatmap(idxArr, customEnemies){
 
   // Warnings
   const warnings=[];
-  sc.forEach((scName,ci)=>{
-    const avgs=ve.map((_,ei)=>cellAvg(ei,ci)).filter(a=>a!==null);
+  sc.forEach(s=>{
+    const avgs=ve.map(e=>cellAvg(e,s)).filter(a=>a!==null);
     if(!avgs.length)return;
     const weakCount=avgs.filter(a=>a<0.85).length;
     if(weakCount>=Math.ceil(avgs.length*0.2))
-      warnings.push(`${scName}: in ${weakCount} von ${avgs.length} Matchups schwach`);
+      warnings.push(`${s}: in ${weakCount} von ${avgs.length} Matchups schwach`);
   });
-  ve.forEach((e,ei)=>{
-    const avgs=sc.map((_,ci)=>cellAvg(ei,ci)).filter(a=>a!==null);
+  ve.forEach(e=>{
+    const avgs=sc.map(s=>cellAvg(e,s)).filter(a=>a!==null);
     if(!avgs.length)return;
     const weakCount=avgs.filter(a=>a<0.85).length;
     if(weakCount>=Math.ceil(avgs.length*0.2))
@@ -1257,7 +1238,7 @@ function renderPortfolio(){
     const cov=new Set(combo.flatMap(c=>c.players));
     if(!ap.every(({i})=>cov.has(i)))return false;
     // Every list must have at least one rating
-    return combo.every(c=>getCoverage(G.candidates.indexOf(c))>0);
+    return combo.every(c=>getCoverage(c.name)>0);
   });
   if(!valid.length){out.innerHTML='<div class="box-err">Keine gültige Kombi – Spieler-Zuordnungen prüfen.</div>';return;}
   const sm=document.getElementById('sort-mode').value;
@@ -1276,14 +1257,13 @@ function renderPortfolio(){
     const comboId=`combo-${rank}`;
     // Per-list avg score across all scenarios and enemies
     const listRows=combo.map(c=>{
-      const li=G.candidates.indexOf(c);
       const ve=getVE();const sc2=getActiveSzenarien();
       const vals=[];
-      ve.forEach((_,ei)=>sc2.forEach((_,ci)=>{const v=getR(li,ei,ci);if(v)vals.push(getPts(v));}));
+      ve.forEach(e=>sc2.forEach(s=>{const v=getR(c.name,e,s);if(v)vals.push(getPts(v));}));
       const avg=vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:null;
-      const cov=getCoverage(li);
+      const li=G.candidates.indexOf(c);
       const isInPicked=pickedSet.has(li);
-      return{c,li,avg,cov,isInPicked};
+      return{c,avg,isInPicked};
     }).sort((a,b)=>(b.avg??-1)-(a.avg??-1)).map(({c,avg,isInPicked})=>{
       const borderStyle=isInPicked?'border:1px solid #ddd;background:#fff':'border:1px solid #ddd;background:#f5f4f0';
       const scoreColor=avg===null?'#ccc':avg>=1.05?'#4a8c10':avg>=0.85?'#888':'#c00';
@@ -1330,35 +1310,18 @@ function addTourneyTeam(){
   G.tourneyTeams.push({name:'',lists:Array(5).fill(null).map(()=>({type:'meta',val:'',manual:''})),ratings:{},open:false});
   save();renderTourneyTeams();
 }
-function getMetaOpts(sel){
-  const metaOpts=getVE().map(e=>`<option value="meta:${e}"${sel===`meta:${e}`?' selected':''}>${e}</option>`).join('');
-  const extraOpts=(G.extraLists||[]).filter(e=>e.trim()).map(e=>`<option value="extra:${e}"${sel===`extra:${e}`?' selected':''}>${e}</option>`).join('');
-  const sep=extraOpts?`<option disabled>── Extra-Listen ──</option>`:'';
-  return`<option value="">– Liste wählen –</option>${metaOpts}${sep}${extraOpts}`;
+function getListOpts(sel){
+  return`<option value="">– Liste wählen –</option>`+
+    ALL_LISTS.map(l=>`<option value="${l}"${sel===l?' selected':''}>${l}</option>`).join('');
 }
 function onTTListChange(ti,li,val){
-  if(val.startsWith('meta:')){
-    G.tourneyTeams[ti].lists[li]={type:'meta',val:val.slice(5),manual:''};
-  } else if(val.startsWith('extra:')){
-    G.tourneyTeams[ti].lists[li]={type:'extra',val:val.slice(6),manual:''};
-  } else {
-    G.tourneyTeams[ti].lists[li]={type:'meta',val:'',manual:''};
-  }
-  save();renderTourneyTeams();
+  G.tourneyTeams[ti].lists[li]={type:'meta',val:val,manual:''};
+  save();renderTourneyTeams();renderExtraEnemyInputs();renderMatrixContent();
 }
 function getTTName(l){
   if(!l||typeof l==='string')return l||'';
   if(l.type==='manual')return l.manual||'';
   return l.val||'';
-}
-function confirmAddExtraList(ti){
-  const inp=document.getElementById(`new-extra-input-${ti}`);
-  if(!inp)return;
-  const name=inp.value.trim();
-  if(!name)return;
-  if(!G.extraLists)G.extraLists=[];
-  if(!G.extraLists.includes(name))G.extraLists.push(name);
-  save();renderExtraEnemyInputs();renderMatrixContent();renderTourneyTeams();
 }
 function toggleTT(ti){
   G.tourneyTeams[ti].open=!G.tourneyTeams[ti].open;
@@ -1387,12 +1350,8 @@ function renderTourneyTeams(){
         <div class="label" style="margin-bottom:8px">5 Listen</div>
         ${team.lists.map((l,li)=>`
           <div style="margin-bottom:8px">
-            <select onchange="onTTListChange(${ti},${li},this.value)">${getMetaOpts(l.type==='extra'?`extra:${l.val}`:`meta:${l.val}`)}</select>
+            <select onchange="onTTListChange(${ti},${li},this.value)">${getListOpts(getTTName(l))}</select>
           </div>`).join('')}
-        <div style="display:flex;gap:6px;margin-bottom:12px;align-items:center">
-          <input type="text" id="new-extra-input-${ti}" placeholder="Neue Liste anlegen…" style="flex:1">
-          <button class="btn btn-sm btn-primary" onclick="confirmAddExtraList(${ti})">+</button>
-        </div>
         <div class="divider"></div>
         <div class="label" style="margin-bottom:6px">Matchup-Einschätzungen</div>
         <div id="tt-mx-${ti}"></div>
@@ -1404,39 +1363,9 @@ function renderTourneyTeams(){
   }).join('');
   G.tourneyTeams.forEach((_,ti)=>{if(G.tourneyTeams[ti].open)renderTTMx(ti);});
 }
-function renderTTMx(ti){
-  const wrap=document.getElementById(`tt-mx-${ti}`);if(!wrap)return;
-  const team=G.tourneyTeams[ti];
-  const validOpp=team.lists.map(l=>getTTName(l)).filter(l=>l.trim());
-  if(!validOpp.length||!G.selectedCombo){wrap.innerHTML='<p class="hint">Erst finale 5 in Phase 4 wählen.</p>';return;}
-  const sc=getActiveSzenarien();
-  if(!sc.length){wrap.innerHTML='<p class="hint">Erst Szenarien in Phase 3 wählen.</p>';return;}
-  wrap.innerHTML=buildHeatmap(G.selectedCombo, validOpp);
-}
-function updTTR(ti,ml,el,ci,val){
-  // check if el is a meta enemy
-  const ei=G.enemies.indexOf(el);
-  if(ei>=0){G.matrix[mkey(G.candidates.findIndex(c=>c.name===ml),ei,ci)]=val;save();return;}
-  // check if extra list
-  const xi=(G.extraLists||[]).indexOf(el);
-  const li=G.candidates.findIndex(c=>c.name===ml);
-  if(xi>=0&&li>=0){if(!G.extraMatrix)G.extraMatrix={};G.extraMatrix[`${li}_${xi}_${ci}`]=val;save();return;}
-  // fallback to team ratings
-  if(!G.tourneyTeams[ti].ratings)G.tourneyTeams[ti].ratings={};
-  if(!G.tourneyTeams[ti].ratings[ml])G.tourneyTeams[ti].ratings[ml]={};
-  const sc=getActiveSzenarien();
-  if(!G.tourneyTeams[ti].ratings[ml][el])G.tourneyTeams[ti].ratings[ml][el]=Array(sc.length).fill('');
-  G.tourneyTeams[ti].ratings[ml][el][ci]=val;
-  save();
-}
-function updExtraMatrix(li,xi,ci,val){
-  if(!G.extraMatrix)G.extraMatrix={};
-  G.extraMatrix[`${li}_${xi}_${ci}`]=val;
-  save(); // just save, don't re-render
-}
 let extraMatrixTab=0;
-function renderExtraMatrix(){/* no-op: extra lists now shown inline in renderMatrixContent */}
-function removeExtraList(xi){removeExtraEnemy(xi);}
+function renderExtraMatrix(){/* no-op */}
+function removeExtraList(xi){/* no-op */}
 
 
 // ══════════════════════════════════════════════════════════════════
@@ -1451,6 +1380,7 @@ function showView(id){
   currentViewId=id;
   if(id==='runde'){
     renderTeamSelect();
+    renderStrike();
     const r=R();
     const sc=getActiveSzenarien();
     const catEl=document.getElementById('round-cat');
@@ -1555,15 +1485,6 @@ function renderMyListSelects(){
   if(msSel)msSel.innerHTML='<option value="">– wählen –</option>'+myLists.map((c,i)=>`<option value="${i}">${c.name}</option>`).join('');
 }
 
-function confirmAddOppExtraList(){
-  const inp=document.getElementById('new-opp-extra-input');
-  if(!inp)return;
-  const name=inp.value.trim();
-  if(!name)return;
-  if(!G.extraLists)G.extraLists=[];
-  if(!G.extraLists.includes(name))G.extraLists.push(name);
-  save();renderStrike();renderExtraEnemyInputs();renderMatrixContent();
-}
 
 function renderStrikeHeatmap(){
   const r=R();
@@ -1606,16 +1527,11 @@ function renderStrikeHeatmap(){
 
   myLists.forEach((c,i)=>{
     const fadedRow=i===fadedMyIdx;
-    const realLi=G.selectedCombo[i];
     html+=`<tr><td style="font-size:10px;color:${fadedRow?'#bbb':'#555'};font-weight:${fadedRow?'400':'600'};padding:2px 4px 2px 0;white-space:nowrap">${c.name.length>10?c.name.slice(0,9)+'…':c.name}</td>`;
     oppLists.forEach(opp=>{
       const fadedCol=opp===fadedOppName;
       const faded=fadedRow||fadedCol;
-      const ei=G.enemies.indexOf(opp);
-      const xi=(G.extraLists||[]).indexOf(opp);
-      let val='';
-      if(ei>=0)val=getR(realLi,ei,ci)||'';
-      else if(xi>=0)val=(G.extraMatrix||{})[`${realLi}_${xi}_${ci}`]||'';
+      const val=r.scenario?getR(c.name,opp,r.scenario)||'':'';
       const col=cellColor(val,faded);
       const label=val?RATINGS.find(x=>x.val===val)?.label||'·':'·';
       html+=`<td onclick="showStrikeHmInfo('${uid}','${c.name.replace(/'/g,"\\'")}','${opp.replace(/'/g,"\\'")}','${label}')"
@@ -1639,48 +1555,33 @@ function showStrikeHmInfo(uid,myList,oppList,label){
 
 // Strike
 function renderStrike(){
-  if(!G.selectedCombo)return;
   const r=R();
-  const sc=getActiveSzenarien();
-  const ci=sc.indexOf(r.scenario||'');
-  const myLists=G.selectedCombo.map(i=>G.candidates[i]).filter(Boolean);
   const hasTeam=r.teamIdx>=0&&G.tourneyTeams[r.teamIdx];
 
-  // Opp lists
-  const oppListOpts=(sel)=>'<option value="">– Liste wählen –</option>'+
-    getVE().map(e=>`<option value="${e}"${sel===e?' selected':''}>${e}</option>`).join('')+
-    ((G.extraLists||[]).filter(e=>e.trim()).length?'<option disabled>── Extra-Listen ──</option>':'')+
-    (G.extraLists||[]).filter(e=>e.trim()).map(e=>`<option value="${e}"${sel===e?' selected':''}>${e}</option>`).join('');
-
+  // Always render opp lists regardless of selectedCombo
   if(hasTeam){
     const team=G.tourneyTeams[r.teamIdx];
     document.getElementById('opp-lists-input').innerHTML=
       team.lists.map((l,i)=>`
         <div class="row">
-          <select onchange="G.tourneyTeams[${r.teamIdx}].lists[${i}]={type:this.value.startsWith('extra:')?'extra':'meta',val:this.value.startsWith('extra:')?this.value.slice(6):this.value,manual:''};save();renderStrike();updateOppStrikeOpts();renderDecisionSelects()">
-            ${oppListOpts(l.type==='extra'?`extra:${l.val}`:l.val)}
+          <select onchange="G.tourneyTeams[${r.teamIdx}].lists[${i}]={type:'meta',val:this.value,manual:''};save();renderStrike();updateOppStrikeOpts();renderDecisionSelects()">
+            ${getListOpts(getTTName(l))}
           </select>
-        </div>`).join('')+
-      `<div style="display:flex;gap:6px;margin-top:6px;align-items:center">
-        <input type="text" id="new-opp-extra-input" placeholder="Neue Liste anlegen…" style="flex:1">
-        <button class="btn btn-sm btn-primary" onclick="confirmAddOppExtraList()">+</button>
-      </div>`;
+        </div>`).join('');
   } else {
     document.getElementById('opp-lists-input').innerHTML=
       (r.oppLists||['','','','','']).map((l,i)=>`
         <div class="row">
           <select onchange="G.rounds[${G.currentRound}].oppLists[${i}]=this.value;save();updateOppStrikeOpts();renderDecisionSelects();renderStrikeHeatmap()">
-            ${oppListOpts(l)}
+            ${getListOpts(l)}
           </select>
-        </div>`).join('')+
-      `<div style="display:flex;gap:6px;margin-top:6px;align-items:center">
-        <input type="text" id="new-opp-extra-input" placeholder="Neue Liste anlegen…" style="flex:1">
-        <button class="btn btn-sm btn-primary" onclick="confirmAddOppExtraList()">+</button>
-      </div>`;
+        </div>`).join('');
   }
   updateOppStrikeOpts();
 
-  const scores=myLists.map((c,li)=>({name:c.name,li,avg:avgForList(G.selectedCombo[li],ci)}));
+  if(!G.selectedCombo)return;
+  const sc=getActiveSzenarien();
+  const myLists=G.selectedCombo.map(i=>G.candidates[i]).filter(Boolean);
   const ratedScores=scores.filter(s=>s.avg!==null);
   const minAvg=ratedScores.length?Math.min(...ratedScores.map(s=>s.avg)):null;
   document.getElementById('strike-rec').innerHTML=
@@ -1728,41 +1629,32 @@ function renderAttack(){
 
   if(!available.length){document.getElementById('attack-rec').innerHTML='<p class="hint">Erst streichen in 2a.</p>';return;}
 
-  const getVal=(realLi,opp)=>{
-    if(ci<0)return'';
-    const ei=G.enemies.indexOf(opp);
-    if(ei>=0)return getR(realLi,ei,ci)||'';
-    const xi=(G.extraLists||[]).indexOf(opp);
-    if(xi>=0)return(G.extraMatrix||{})[`${realLi}_${xi}_${ci}`]||'';
-    return'';
+  const getVal=(listName,opp)=>{
+    if(!r.scenario)return'';
+    return getR(listName,opp,r.scenario)||'';
   };
 
   let html='';
   available.forEach((c,localI)=>{
     const globalI=myLists.indexOf(c);
-    const realLi=G.selectedCombo[globalI];
     const isPicked=r.attacker===String(globalI);
 
-    // Counter count: how many opp lists have − or −− vs this list
     const counters=oppLists.filter(opp=>{
-      const v=getVal(realLi,opp);
+      const v=getVal(c.name,opp);
       return v==='lu'||v==='ku';
     });
 
-    // Pool quality: avg of remaining 3 lists vs all opp lists
     const poolLists=available.filter(p=>p!==c);
     const poolVals=poolLists.flatMap(p=>{
-      const pRealLi=G.selectedCombo[myLists.indexOf(p)];
       return oppLists.map(opp=>{
-        const v=getVal(pRealLi,opp);
+        const v=getVal(p.name,opp);
         return v?getPts(v):null;
       }).filter(v=>v!==null);
     });
     const poolAvg=poolVals.length?poolVals.reduce((a,b)=>a+b,0)/poolVals.length:null;
     const poolCls=poolAvg!==null?chipCls(poolAvg):null;
 
-    // Own ratings vs opp lists
-    const ownRatings=oppLists.map(opp=>({opp,val:getVal(realLi,opp)}));
+    const ownRatings=oppLists.map(opp=>({opp,val:getVal(c.name,opp)}));
 
     const counterColor=counters.length===0?'#4a8c10':counters.length===1?'#b08000':'#c00';
 
@@ -1819,13 +1711,9 @@ function renderDefend(){
   // Remaining opp lists (not attacker)
   const oppRemaining=oppLists.filter(l=>l!==oppAtk);
 
-  const getVal=(realLi,opp)=>{
-    if(ci<0)return'';
-    const ei=G.enemies.indexOf(opp);
-    if(ei>=0)return getR(realLi,ei,ci)||'';
-    const xi=(G.extraLists||[]).indexOf(opp);
-    if(xi>=0)return(G.extraMatrix||{})[`${realLi}_${xi}_${ci}`]||'';
-    return'';
+  const getVal=(listName,opp)=>{
+    if(!r.scenario)return'';
+    return getR(listName,opp,r.scenario)||'';
   };
 
   // All 3 combinations of 2 defenders from 3 available lists
@@ -1840,16 +1728,13 @@ function renderDefend(){
 
   let html='';
   combos.forEach(({defenders,pool},ci2)=>{
-    const poolRealLi=G.selectedCombo[myLists.indexOf(pool)];
-
     const defRatings=defenders.map(d=>{
-      const realLi=G.selectedCombo[myLists.indexOf(d)];
-      const val=getVal(realLi,oppAtk);
+      const val=getVal(d.name,oppAtk);
       return{name:d.name,val};
     });
 
     const poolRatings=oppRemaining.map(opp=>({
-      opp,val:getVal(poolRealLi,opp)
+      opp,val:getVal(pool.name,opp)
     }));
 
     const defPts=defRatings.map(d=>d.val?getPts(d.val):1.0);
@@ -1910,16 +1795,13 @@ function renderDecisionSelects(){
   renderDecision();
 }
 
-function saveMasterVal(realLi,oppName,val,roundIdx){
+function saveMasterVal(listName,oppName,val,roundIdx){
   const r=G.rounds[roundIdx];
-  const sc=getActiveSzenarien();
-  const ci=sc.indexOf(r.scenario||'');
-  if(ci<0){r.mRatings[`${realLi}_${oppName}`]=val;save();return;}
-  const ei=G.enemies.indexOf(oppName);
-  if(ei>=0){G.matrix[mkey(realLi,ei,ci)]=val;save();return;}
-  const xi=(G.extraLists||[]).indexOf(oppName);
-  if(xi>=0){if(!G.extraMatrix)G.extraMatrix={};G.extraMatrix[`${realLi}_${xi}_${ci}`]=val;save();return;}
-  r.mRatings[`${realLi}_${oppName}`]=val;save();
+  if(!r.scenario){r.mRatings=r.mRatings||{};r.mRatings[`${listName}||${oppName}`]=val;save();return;}
+  const key=mkey(listName,oppName,r.scenario);
+  G.matrix[key]=val;
+  _dirtyMatrixKeys.add(key);
+  save();
 }
 
 function renderDecision(){
@@ -1932,26 +1814,21 @@ function renderDecision(){
   if(atkIdx<0||poolIdx<0||!defA||!defB||atkIdx===poolIdx){detail.style.display='none';return;}
   detail.style.display='block';
 
-  const ci=getActiveSzenarien().indexOf(r.scenario||'');
   const myLists=G.selectedCombo.map(i=>G.candidates[i]).filter(Boolean);
   const atkName=myLists[atkIdx]?.name||'';const poolName=myLists[poolIdx]?.name||'';
-  const atkRealLi=G.selectedCombo[atkIdx];const poolRealLi=G.selectedCombo[poolIdx];
 
   document.getElementById('decision-cat-label').textContent=`Matchup · ${r.scenario||'kein Szenario'}`;
 
-  function getMasterVal(realLi,oppName){
-    const ei=G.enemies.indexOf(oppName);
-    if(ei>=0&&ci>=0)return getR(realLi,ei,ci)||'';
-    const xi=(G.extraLists||[]).indexOf(oppName);
-    if(xi>=0&&ci>=0)return(G.extraMatrix||{})[`${realLi}_${xi}_${ci}`]||'';
-    return R().mRatings[`${realLi}_${oppName}`]||'';
+  function getMasterVal(listName,oppName){
+    if(r.scenario)return getR(listName,oppName,r.scenario)||'';
+    return(R().mRatings||{})[`${listName}||${oppName}`]||'';
   }
 
-  function mBlock(id,realLi,oppName,label){
-    const cur=getMasterVal(realLi,oppName)||'50';
+  function mBlock(id,listName,oppName,label){
+    const cur=getMasterVal(listName,oppName)||'50';
     let html=`<div class="label" style="margin-bottom:4px">${label}</div>`;
     html+=`<select class="rating-sel r-${cur}" id="${id}"
-      onchange="saveMasterVal(${realLi},'${oppName.replace(/'/g,"\\'")}',this.value,${G.currentRound});calcResult();this.className='rating-sel r-'+this.value">
+      onchange="saveMasterVal('${listName.replace(/'/g,"\\'")}','${oppName.replace(/'/g,"\\'")}',this.value,${G.currentRound});calcResult();this.className='rating-sel r-'+this.value">
       ${RATINGS.map(rt=>`<option value="${rt.val}"${cur===rt.val?' selected':''}>${rt.label}</option>`).join('')}
     </select>`;
     return html;
@@ -1959,10 +1836,10 @@ function renderDecision(){
 
   document.getElementById('d-m-inputs').innerHTML=`
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-      <div>${mBlock('atk_a',atkRealLi,defA,`${atkName} vs ${defA}`)}</div>
-      <div>${mBlock('atk_b',atkRealLi,defB,`${atkName} vs ${defB}`)}</div>
-      <div>${mBlock('pool_b',poolRealLi,defB,`${poolName} vs ${defB} (auto wenn A)`)}</div>
-      <div>${mBlock('pool_a',poolRealLi,defA,`${poolName} vs ${defA} (auto wenn B)`)}</div>
+      <div>${mBlock('atk_a',atkName,defA,`${atkName} vs ${defA}`)}</div>
+      <div>${mBlock('atk_b',atkName,defB,`${atkName} vs ${defB}`)}</div>
+      <div>${mBlock('pool_b',poolName,defB,`${poolName} vs ${defB} (auto wenn A)`)}</div>
+      <div>${mBlock('pool_a',poolName,defA,`${poolName} vs ${defA} (auto wenn B)`)}</div>
     </div>`;
   calcResult();
 }
@@ -1973,23 +1850,16 @@ function calcResult(){
   const poolIdx=r.pool!==''?parseInt(r.pool):-1;
   if(atkIdx<0||poolIdx<0||!r.defA||!r.defB)return;
   const myLists=G.selectedCombo.map(i=>G.candidates[i]).filter(Boolean);
-  const sc=getActiveSzenarien();
-  const ci=sc.indexOf(r.scenario||'');
-  const atkRealLi=G.selectedCombo[atkIdx];
-  const poolRealLi=G.selectedCombo[poolIdx];
+  const atkName=myLists[atkIdx]?.name||'';
+  const poolName=myLists[poolIdx]?.name||'';
 
-  function getVal(realLi,oppName){
-    if(ci>=0){
-      const ei=G.enemies.indexOf(oppName);
-      if(ei>=0)return getR(realLi,ei,ci)||'50';
-      const xi=(G.extraLists||[]).indexOf(oppName);
-      if(xi>=0)return(G.extraMatrix||{})[`${realLi}_${xi}_${ci}`]||'50';
-    }
-    return r.mRatings[`${realLi}_${oppName}`]||'50';
+  function getVal(listName,oppName){
+    if(r.scenario)return getR(listName,oppName,r.scenario)||'50';
+    return(r.mRatings||{})[`${listName}||${oppName}`]||'50';
   }
 
-  const chooseA=getPts(getVal(atkRealLi,r.defA))+getPts(getVal(poolRealLi,r.defB));
-  const chooseB=getPts(getVal(atkRealLi,r.defB))+getPts(getVal(poolRealLi,r.defA));
+  const chooseA=getPts(getVal(atkName,r.defA))+getPts(getVal(poolName,r.defB));
+  const chooseB=getPts(getVal(atkName,r.defB))+getPts(getVal(poolName,r.defA));
   const diff=Math.abs(chooseA-chooseB);const bestA=chooseA>=chooseB;
   document.getElementById('d-result').innerHTML=`
     <div class="matchup-box${bestA?' best':''}">
@@ -2127,10 +1997,8 @@ function renderAuswUebersicht(){
       const myListIdx=m.myList!==''?parseInt(m.myList):-1;
       let expR=null;
       if(myListIdx>=0&&G.selectedCombo){
-        const realLi=G.selectedCombo[myListIdx];
-        const ei=G.enemies.indexOf(m.oppList);
-        const ci=getActiveSzenarien().indexOf(r.scenario||'');
-        if(ei>=0&&ci>=0)expR=getR(realLi,ei,ci);
+        const listName=G.candidates[G.selectedCombo[myListIdx]]?.name;
+        if(listName&&m.oppList&&r.scenario)expR=getR(listName,m.oppList,r.scenario);
       }
       const isBad=expR==='lu'||expR==='ku';
       if(isBad)ps.badMatchups++;
@@ -2247,13 +2115,9 @@ function renderAuswMatchups(){
       if(m.myPts===null||!m.myList)return;
       const mp=parseInt(m.myPts),op=parseInt(m.oppPts);
       const myListIdx=parseInt(m.myList);
-      const realLi=G.selectedCombo?G.selectedCombo[myListIdx]:-1;
-      const ei=G.enemies.indexOf(m.oppList);
+      const listName=G.selectedCombo?G.candidates[G.selectedCombo[myListIdx]]?.name:null;
       let expR=null;
-      if(realLi>=0&&ei>=0){
-        const ci=getActiveSzenarien().indexOf(r.scenario||'');
-        if(ci>=0)expR=getR(realLi,ei,ci);
-      }
+      if(listName&&m.oppList&&r.scenario)expR=getR(listName,m.oppList,r.scenario);
       let out='',oc='#888';
       if(mp>op){out='Sieg';oc='#4a8c10';}else if(mp===op){out='Unentschieden';oc='#b08000';}else{out='Niederlage';oc='#c00';}
       let diff=null;
