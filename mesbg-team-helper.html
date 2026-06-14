@@ -527,7 +527,7 @@ let G={
   currentRound:0,
   rounds:[{
     scenario:'',oppName:'',oppLists:['','','','',''],teamIdx:-1,oppStruck:'',myStruck:'',
-    oppAttacker:'',attacker:'',pool:'',defA:'',defB:'',mRatings:{},
+    oppAttacker:'',attacker:'',pool:'',defA:'',defB:'',myDefA:'',myDefB:'',mRatings:{},
     matchups:Array(4).fill(null).map(()=>({myList:'',oppList:'',myPts:null,oppPts:null}))
   }]
 };
@@ -794,7 +794,7 @@ function setMode(mode){
     const sc=getActiveSzenarien();
     const catEl=document.getElementById('round-cat');
     if(catEl)catEl.innerHTML='<option value="">– wählen –</option>'+sc.map(s=>`<option value="${s}"${r.scenario===s?' selected':''}>${s}</option>`).join('');
-    renderStrike();renderAttack();
+    renderStrike();renderAttack();renderRoundMatrix();
   }
   if(mode==='auswertung')renderAuswertung();
   updateNavHash();
@@ -1460,6 +1460,7 @@ function showView(id){
     }
     document.getElementById('opp-name').value=r.oppName||'';
     renderStrike();
+    renderRoundMatrix();
   }
   if(id==='strike')renderStrike();
   if(id==='attack')renderAttack();
@@ -1485,7 +1486,7 @@ function updateRoundBadge(){
 function addRunde(){
   G.rounds.push({
     scenario:'',oppName:'',oppLists:['','','','',''],teamIdx:-1,oppStruck:'',myStruck:'',
-    oppAttacker:'',attacker:'',pool:'',defA:'',defB:'',mRatings:{},
+    oppAttacker:'',attacker:'',pool:'',defA:'',defB:'',myDefA:'',myDefB:'',mRatings:{},
     matchups:Array(4).fill(null).map(()=>({myList:'',oppList:'',myPts:null,oppPts:null}))
   });
   G.currentRound=G.rounds.length-1;
@@ -1515,7 +1516,7 @@ function setRound(i){
     catEl.innerHTML='<option value="">– wählen –</option>'+sc.map(s=>`<option value="${s}"${r.scenario===s?' selected':''}>${s}</option>`).join('');
   }
   const oppEl=document.getElementById('opp-name');if(oppEl)oppEl.value=r.oppName||'';
-  renderStrike();renderAttack();renderDefend();renderDecisionSelects();renderResults();
+  renderStrike();renderAttack();renderDefend();renderDecisionSelects();renderResults();renderRoundMatrix();
 }
 
 function renderTeamSelect(){
@@ -1860,10 +1861,10 @@ function renderDefend(){
     const defPts=defRatings.map(d=>d.val?getPts(d.val):1.0);
     const worstDef=Math.min(...defPts);
     const defNames=new Set([defenders[0].name,defenders[1].name]);
-    const isPicked=r.defA&&r.defB&&defNames.has(r.defA)&&defNames.has(r.defB)&&defNames.size===2;
+    const isPicked=r.myDefA&&r.myDefB&&defNames.has(r.myDefA)&&defNames.has(r.myDefB)&&defNames.size===2;
     const borderColor=isPicked?'#6ab820':worstDef>=1.5?'#90c040':worstDef>=1.0?'#ddd':'#e08080';
 
-    html+=`<div onclick="R().defA='${defenders[0].name}';R().defB='${defenders[1].name}';R().pool=String(${myLists.indexOf(pool)});save();renderDefend()"
+    html+=`<div onclick="R().myDefA='${defenders[0].name}';R().myDefB='${defenders[1].name}';R().pool=String(${myLists.indexOf(pool)});save();renderDefend()"
       style="border:1px solid ${borderColor};border-radius:10px;padding:14px;margin-bottom:10px;background:${isPicked?'#f4fbe8':'#fff'};cursor:pointer">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
         <span style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.05em">Kombi ${ci2+1}</span>
