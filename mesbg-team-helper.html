@@ -1532,14 +1532,18 @@ function getOppLists(){
 }
 
 function selectTeam(val){
-  if(val==='')return;
+  const r=R();
+  if(val===''){
+    r.teamIdx=-1;
+    save();renderStrike();renderRoundMatrix();
+    return;
+  }
   const ti=parseInt(val);
   const team=G.tourneyTeams[ti];if(!team)return;
-  const r=R();
   r.teamIdx=ti;
   r.oppName=team.name;
   document.getElementById('opp-name').value=team.name;
-  save();renderStrike();
+  save();renderStrike();renderRoundMatrix();
 }
 
 function renderMyListSelects(){
