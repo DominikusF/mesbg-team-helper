@@ -1643,6 +1643,89 @@ function showStrikeHmInfo(uid,myList,oppList,label){
   if(el)el.textContent=`${myList}  vs  ${oppList}  ·  ${label}`;
 }
 
+// Round Matrix
+function renderRoundMatrix(){
+  const wrap=document.getElementById('round-matrix');if(!wrap)return;
+  const r=R();
+  const sc=getActiveSzenarien();
+  const ci=sc.indexOf(r.scenario||'');
+  if(!G.selectedCombo){wrap.innerHTML='';return;}
+  if(ci<0){
+    wrap.innerHTML='<div class="card" style="margin-top:12px"><p class="hint">Erst Szenario wählen um die Matchup-Matrix zu sehen.</p></div>';
+    return;
+  }
+  const myLists=G.selectedCombo.map(i=>G.candidates[i]).filter(Boolean);
+  const oppLists=getOppLists().filter(l=>l.trim());
+  if(!oppLists.length){
+    wrap.innerHTML='<div class="card" style="margin-top:12px"><p class="hint">Erst Gegner-Listen eintragen um die Matchup-Matrix zu sehen.</p></div>';
+    return;
+  }
+
+  const oppEntries=oppLists.map(name=>{
+    const ei=G.enemies.indexOf(name);
+    if(ei>=0)return{name,type:'meta',idx:ei};
+    const xi=(G.extraLists||[]).indexOf(name);
+    if(xi>=0)return{name,type:'extra',idx:xi};
+    return{name,type:'unknown',idx:-1};
+  });
+
+  const colScores=oppEntries.map(({type,idx})=>{
+    const vals=myLists.map((_,mi)=>{
+      const li=G.selectedCombo[mi];
+      const v=type==='meta'?G.matrix[mkey(li,idx,ci)]||'':
+               type==='extra'?(G.extraMatrix||{})[`${li}_${idx}_${ci}`]||'':'';
+      return v?getPts(v):null;
+    }).filter(v=>v!==null);
+    return vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:null;
+  });
+
+  const allVals=colScores.filter(v=>v!==null);
+  const totalScore=allVals.length?allVals.reduce((a,b)=>a+b,0)/allVals.length:null;
+
+  let html='<div class="card" style="margin-top:12px">';
+  html+=`<div class="card-title" style="margin-bottom:10px">Matchup-Matrix · ${r.scenario}</div>`;
+  html+='<div class="matrix-wrap"><table class="matrix-table"><thead><tr>';
+  html+=`<th class="rh" style="font-weight:400;color:#888;font-size:11px"></th>`;
+  oppEntries.forEach(({name})=>html+=`<th style="min-width:80px">${name.length>12?name.slice(0,11)+'…':name}</th>`);
+  html+='</tr>';
+
+  html+='<tr style="background:#fafaf8">';
+  html+=`<td style="padding:3px 4px">${totalScore!==null?`<span style="font-size:10px;color:${totalScore>=1.05?'#4a8c10':totalScore>=0.85?'#888':'#c00'};font-family:var(--mono);font-weight:600">${totalScore.toFixed(2)}</span>`:'<span style="color:#ddd;font-size:10px">–</span>'}</td>`;
+  colScores.forEach(s=>{
+    html+=`<td style="text-align:center;padding:3px 2px">${s!==null?`<span style="font-size:10px;color:${s>=1.05?'#4a8c10':s>=0.85?'#888':'#c00'};font-family:var(--mono)">${s.toFixed(2)}</span>`:'<span style="color:#ddd;font-size:10px">–</span>'}</td>`;
+  });
+  html+='</tr></thead><tbody>';
+
+  myLists.forEach((c,mi)=>{
+    const li=G.selectedCombo[mi];
+    const rowVals=oppEntries.map(({type,idx})=>{
+      const v=type==='meta'?G.matrix[mkey(li,idx,ci)]||'':
+               type==='extra'?(G.extraMatrix||{})[`${li}_${idx}_${ci}`]||'':'';
+      return v?getPts(v):null;
+    }).filter(v=>v!==null);
+    const rowScore=rowVals.length?rowVals.reduce((a,b)=>a+b,0)/rowVals.length:null;
+    const scoreSpan=rowScore!==null?`<span style="font-size:10px;color:${rowScore>=1.05?'#4a8c10':rowScore>=0.85?'#888':'#c00'};font-family:var(--mono);margin-right:5px">${rowScore.toFixed(2)}</span>`:'';
+    html+=`<tr><td style="font-size:12px;padding:6px 4px;color:#555;white-space:nowrap">${scoreSpan}${c.name}</td>`;
+    oppEntries.forEach(({type,idx})=>{
+      if(type==='meta'){
+        const key=mkey(li,idx,ci);
+        const val=G.matrix[key]||'';
+        html+=`<td>${rSel(`rmx_${li}_${idx}_${ci}`,val,`G.matrix['${key}']=this.value;_dirtyMatrixKeys.add('${key}');save();renderRoundMatrix()`)}</td>`;
+      } else if(type==='extra'){
+        const key=`${li}_${idx}_${ci}`;
+        const val=(G.extraMatrix||{})[key]||'';
+        html+=`<td>${rSel(`rexmx_${li}_${idx}_${ci}`,val,`updExtraMatrix(${li},${idx},${ci},this.value);_dirtyExtraMatrixKeys.add('${key}')`)}</td>`;
+      } else {
+        html+=`<td><span style="font-size:11px;color:#ccc">–</span></td>`;
+      }
+    });
+    html+='</tr>';
+  });
+
+  html+='</tbody></table></div></div>';
+  wrap.innerHTML=html;
+}
+
 // Strike
 function renderStrike(){
   if(!G.selectedCombo)return;
