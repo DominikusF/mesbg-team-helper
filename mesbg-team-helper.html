@@ -1859,7 +1859,8 @@ function renderDefend(){
 
     const defPts=defRatings.map(d=>d.val?getPts(d.val):1.0);
     const worstDef=Math.min(...defPts);
-    const isPicked=r.defA===defenders[0].name&&r.defB===defenders[1].name;
+    const defNames=new Set([defenders[0].name,defenders[1].name]);
+    const isPicked=r.defA&&r.defB&&defNames.has(r.defA)&&defNames.has(r.defB)&&defNames.size===2;
     const borderColor=isPicked?'#6ab820':worstDef>=1.5?'#90c040':worstDef>=1.0?'#ddd':'#e08080';
 
     html+=`<div onclick="R().defA='${defenders[0].name}';R().defB='${defenders[1].name}';R().pool=String(${myLists.indexOf(pool)});save();renderDefend()"
